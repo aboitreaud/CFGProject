@@ -180,7 +180,7 @@ class CFG:
         return latent, err
 
     def get_vocab_size(self):
-        return np.prod(self.T)
+        return self.ns[-1]
 
     def get_sentence_length(self):
         return np.prod(self.T)
