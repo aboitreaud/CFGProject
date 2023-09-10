@@ -1,3 +1,5 @@
+import torch
+
 from context_free_grammar import CFG
 from grammar import Grammar
 
@@ -18,7 +20,8 @@ if __name__ == '__main__':
     s, labels = cfg.sample(nspl)
     # for i, sentence in enumerate(s):
     #     print('Sentence {i} is: {sent}'.format(i=i, sent=sentence.detach().numpy()))
-    print(s.shape, labels)
-
-    gram = Grammar(n_levels=4, n_symbols=[3, 3, 3], n_children=[5, 5, 5], n_rules=[2, 2, 2])
-    print(gram.generate_sentence(False))
+    # print(s.shape, labels)
+    print('\n')
+    print("\n")
+    gram = Grammar(n_levels=4, n_symbols=[1, 3, 3, 3], n_children=[5, 5, 5], n_rules=[2, 2, 2])
+    print(gram.generate_n_sentences(nspl=1))

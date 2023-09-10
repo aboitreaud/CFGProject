@@ -27,6 +27,7 @@ class Grammar:
 
         for l in range(n_levels - 1):
             # for each of the n_symbols[l] symbols at level l, we draw n_rules[l] of length n_children[l]
+            # Considering root symbol at level 0, rule[l] is used to expand level l+1 into level l+2
             self.rules.append(torch.randint(0, n_symbols[l+1], size=(n_symbols[l], n_rules[l], n_children[l])))
 
     def generate_sentence(self, root: torch.tensor, debug: bool):
@@ -45,7 +46,9 @@ class Grammar:
         return output_seq
 
     def generate_n_sentences(self, nspl:int, debug: bool = False):
-        sentences = torch.empty(nspl)
+        sentences = torch.empty(nspl, *self.n_children)
         for i in range(nspl):
-            sentences[i] = self.generate_sentence(torch.tensor(0), debug)
+            s = self.generate_sentence(torch.tensor(0), debug)
+            sentences[i] = s
+        return sentences
 
