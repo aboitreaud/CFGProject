@@ -12,7 +12,7 @@ class CFG:
     T_l is the length of the rule at level l
     L is the number of levels
 
-    We have a L+1 levels:
+    We have L+1 levels:
     Level 0: class labels. There are ns_0 labels. Labels are level-0 symbols.
     Level 1: Tensors of shape (T_0,) containing level-1 symbols (there are ns_1 level-1 symbols)
     Level 2: Tensors of shape (T_0,T_1) containing level-2 symbols (there are ns_2 level-2 symbols)
@@ -36,7 +36,7 @@ class CFG:
         )  # rules[l] has shape (ns_l, nr_l, T_l) with entries in { 0,1,...,ns_{l+1}-1 }
         for l in range(L):
             self.rules.append(torch.randint(0, ns[l + 1], size=(ns[l], nr[l], T[l])))
-            print("Level {level} rule: {rule} with shape {shape}".format(level=l, rule=self.rules[-1], shape=self.rules[-1].shape))
+            #print("Level {level} rule: {rule} with shape {shape}".format(level=l, rule=self.rules[-1], shape=self.rules[-1].shape))
 
     ######################################################################
     # FUNCTIONS TO GENERATE A SEQUENCE OF SYMBOLS ACCORDING TO THE GRAMMAR
@@ -85,7 +85,7 @@ class CFG:
         """
         labels = torch.arange(self.ns[0]).repeat_interleave(nspl, dim=0)
         S = self.expand_symbols(labels)
-        return torch.reshape(S, (self.ns[0], nspl, -1)), labels
+        return S.view((self.ns[0], nspl, -1)), labels
 
 
     ###################################################################################
@@ -136,14 +136,14 @@ class CFG:
         """
         This function uses rules of level l to coarsen symbols of level l+1 into symbols of level l
         This is the inverse of the expand function.
-        INPUT:    S: LongTensor containing symbols from level i+1
-                     More specifically, S has shape (*,L_i) with entries in {0,1,...,ns_{i+1}-1}
-        OUTPUT:   S_coarsened: LongTensor containing symbols of level i
-                              More specifically, S_coarsened has shape (*) with entries in {0,1,...,ns_{i}-1}
+        INPUT:    S: LongTensor containing symbols from level l+1
+                     More specifically, S has shape (*,T_{i}) with entries in {0,1,...,ns_{l+1}-1}
+        OUTPUT:   S_coarsened: LongTensor containing symbols of level l
+                              More specifically, S_coarsened has shape (*) with entries in {0,1,...,ns_{l}-1}
         """
 
-        # suppose S has shape (T_0,T_1,T_2).
-        # We start by flattening it to have shape (T_0*T_1 , T_2)
+        # S has shape (T_0,T_1,...,T_{l+1}).                                       Could be (T_0,T_1,T2) for level 1
+        # We start by flattening it to have shape (T_0*T_1*...*T_l ,T_{l+1})       For level 1, reshape to (T_0*T_1, T2)
         S_flat = S.view(-1, S.shape[-1])
 
         # For each of the T_0*T_1 sequences in S_flat we find the index of the symbol that generated it
@@ -158,7 +158,7 @@ class CFG:
         S_coarsened = torch.tensor(S_coarsened)
         err = torch.tensor(err)
 
-        # We now reshape S_coarsened and error to have shape (T_0,T_1)
+        # We now reshape S_coarsened and error to have shape (T_0,T_1,...,T_i)     (T_0*T_1, T2) for level 1
         target_shape = S.shape[:-1]
         S_coarsened = S_coarsened.view(target_shape)
         err = err.view(target_shape)
