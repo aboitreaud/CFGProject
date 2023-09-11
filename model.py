@@ -7,7 +7,7 @@ from dataclasses import dataclass
 class GPTConfig:
     vocab_size: int = None
     block_size: int = 256
-    batch_size: int = 12
+    batch_size: int = 24
     n_layer: int = 12
     n_head: int = 12
     n_embd: int = 768
