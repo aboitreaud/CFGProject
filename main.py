@@ -39,19 +39,14 @@ if __name__ == "__main__":
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
     # data loading
-    print(train_data.shape)
     def get_batch(split: str, config: GPTConfig = GPTConfig()):
         data = train_data if split == "train" else val_data
-        print('LENDATA: ', len(data))
-        print('blk size: ', config.block_size)
         # generate a small batch of data of inputs x and targets y
         chosen_sentence = np.random.randint(len(data))
         ix = torch.randint(0, sentence_length - config.block_size, size=(config.batch_size,))
         x = torch.stack([data[chosen_sentence, i: i + config.block_size] for i in ix])
         y = torch.stack([data[chosen_sentence, i+1: i + config.block_size + 1] for i in ix])
         x, y = x.to(config.device), y.to(config.device)
-        print('x.shape', x.shape)
-        print('y.shape', y.shape)
         return x, y
 
     @torch.no_grad()
