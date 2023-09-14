@@ -7,13 +7,13 @@ from dataclasses import dataclass
 class GPTConfig:
     vocab_size: int = None
     block_size: int = 256
-    batch_size: int = 24
+    batch_size: int = 256
     n_layer: int = 12
     n_head: int = 12
     n_embd: int = 768
     head_size = n_embd // n_head
     dropout: float = 0.0
-    device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device: str = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     bias: bool = True  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     eval_iters: int = 200
 

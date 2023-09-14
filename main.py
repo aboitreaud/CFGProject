@@ -77,4 +77,5 @@ if __name__ == "__main__":
     gen_sentence = m.generate(context, max_new_tokens=sentence_length)[0].tolist()
     print(gen_sentence)
 
-    cfg.collapse_and_get_err(gen_sentence)
+    # remove root symbol at the beginning
+    print(cfg.collapse_and_get_err(torch.tensor(gen_sentence[1:]).view(*cfg.T)))
