@@ -13,9 +13,6 @@ if __name__ == "__main__":
     # Each sentence is a tensor of shape (T_0,T_1,...,T_{L-1})
     # Flattened sentences are of length np.prod(T) product of length of the rules at each level
 
-    # get rid of labels and reshape the sentences.
-    train_data = cfg.sample_flattened(int(.9*nspl))[0][0]
-    val_data = cfg.sample_flattened(int(.1*nspl))[0][0]
     sentence_length = np.prod(cfg.T)
 
     config = GPTConfig(vocab_size=cfg.ns[-1], n_embd=384, n_head=6, n_layer=6)
@@ -32,12 +29,11 @@ if __name__ == "__main__":
 
     # data loading
     def get_batch(split: str, config: GPTConfig = GPTConfig()):
-        data = train_data if split == "train" else val_data
+        sentence = cfg.sample_flattened(1)[0][0]
         # generate a small batch of data of inputs x and targets y
-        chosen_sentence = np.random.randint(len(data))
         ix = torch.randint(0, sentence_length - config.block_size, size=(config.batch_size,))
-        x = torch.stack([data[chosen_sentence, i: i + config.block_size] for i in ix])
-        y = torch.stack([data[chosen_sentence, i+1: i + config.block_size + 1] for i in ix])
+        x = torch.stack([sentence[i: i + config.block_size] for i in ix])
+        y = torch.stack([sentence[i+1: i + config.block_size + 1] for i in ix])
         x, y = x.to(config.device), y.to(config.device)
         return x, y
 
