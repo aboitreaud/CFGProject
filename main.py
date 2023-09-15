@@ -22,13 +22,13 @@ if __name__ == "__main__":
     print(sum(p.numel() for p in m.parameters()) / 1e6, "M parameters")
 
     # create a PyTorch optimizer
-    max_iters = 1000
+    max_iters = 2000
     eval_interval = 200
     learning_rate = 3e-4
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
     # data loading
-    def get_batch(split: str, config: GPTConfig = GPTConfig()):
+    def get_batch(config: GPTConfig = GPTConfig()):
         sentence = cfg.sample_flattened(1)[0][0].view(sentence_length)  # reshape in a 1d tensor
         # generate a small batch of data of inputs x and targets y
         ix = torch.randint(0, sentence_length - config.block_size, size=(config.batch_size,))
@@ -41,13 +41,12 @@ if __name__ == "__main__":
     def estimate_loss():
         out = {}
         model.eval()
-        for split in ["train", "val"]:
-            losses = torch.zeros(config.eval_iters)
-            for k in range(config.eval_iters):
-                X, Y = get_batch(split)
-                logits, loss = model(X, Y)
-                losses[k] = loss.item()
-            out[split] = losses.mean()
+        losses = torch.zeros(config.eval_iters)
+        for k in range(config.eval_iters):
+            X, Y = get_batch()
+            logits, loss = model(X, Y)
+            losses[k] = loss.item()
+        out["test"] = losses.mean()
         model.train()
         return out
 
@@ -60,7 +59,7 @@ if __name__ == "__main__":
             )
 
         # sample a batch of data
-        xb, yb = get_batch("train")
+        xb, yb = get_batch()
 
         # evaluate the loss
         logits, loss = model(xb, yb)
