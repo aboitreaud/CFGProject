@@ -67,10 +67,14 @@ if __name__ == "__main__":
         loss.backward()
         optimizer.step()
 
-    # generate from the model
+    # generate n_gen sentences from the model and check their correctness
+    n_gen = 100
     context = torch.zeros((1, 1), dtype=torch.long, device=config.device)
-    gen_sentence = m.generate(context, max_new_tokens=sentence_length)[0].tolist()
-    print(gen_sentence)
+    nb_mistakes = [0 for _ in range(n_gen)]
+    for i in range(n_gen):
+        gen_sentence = m.generate(context, max_new_tokens=sentence_length)[0].tolist()
+        # remove root symbol at the beginning
+        _, err = cfg.collapse_and_get_err(torch.tensor(gen_sentence[1:]).view(*cfg.T)))
+        nb_mistakes[i] = np.sum(err)
+    print(nb_mistakes)
 
-    # remove root symbol at the beginning
-    print(cfg.collapse_and_get_err(torch.tensor(gen_sentence[1:]).view(*cfg.T)))
