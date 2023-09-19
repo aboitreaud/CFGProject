@@ -27,7 +27,7 @@ if __name__ == "__main__":
     max_iters = 5000
     eval_interval = 200
     learning_rate = 3e-4
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 
     # data loading
     def get_batch(config: GPTConfig = GPTConfig()):
@@ -42,14 +42,14 @@ if __name__ == "__main__":
     @torch.no_grad()
     def estimate_loss():
         out = {}
-        model.eval()
+        m.eval()
         losses = torch.zeros(config.eval_iters)
         for k in range(config.eval_iters):
             X, Y = get_batch()
-            logits, loss = model(X, Y)
+            logits, loss = m(X, Y)
             losses[k] = loss.item()
         out["val"] = losses.mean()
-        model.train()
+        m.train()
         return out
 
     for iter in range(max_iters):
@@ -61,13 +61,13 @@ if __name__ == "__main__":
             )
         if iter % 1000 == 0 and iter > 1:
             learning_rate /= 2
-            optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+            optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 
         # sample a batch of data
         xb, yb = get_batch()
 
         # evaluate the loss
-        logits, loss = model(xb, yb)
+        logits, loss = m(xb, yb)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
