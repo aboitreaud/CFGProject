@@ -77,7 +77,7 @@ if __name__ == "__main__":
     for i in range(n_gen):
         gen_sentence = m.generate(context, max_new_tokens=sentence_length)[0].tolist()
         # remove root symbol at the beginning
-        _, err = cfg.collapse_and_get_err(torch.tensor(gen_sentence[1:]).view(*cfg.T)))
+        _, err = cfg.collapse_and_get_err(torch.tensor(gen_sentence[1:]).view(*cfg.T))
         nb_mistakes[i] = np.sum(err)
     print(nb_mistakes)
 
