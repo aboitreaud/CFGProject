@@ -22,7 +22,7 @@ if __name__ == "__main__":
     print(sum(p.numel() for p in m.parameters()) / 1e6, "M parameters")
 
     # create a PyTorch optimizer
-    max_iters = 2000
+    max_iters = 5000
     eval_interval = 200
     learning_rate = 3e-4
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
