@@ -22,7 +22,7 @@ if __name__ == "__main__":
     print(sum(p.numel() for p in m.parameters()) / 1e6, "M parameters")
 
     # create a PyTorch optimizer
-    max_iters = 2000
+    max_iters = 5000
     eval_interval = 200
     learning_rate = 3e-4
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
@@ -46,7 +46,7 @@ if __name__ == "__main__":
             X, Y = get_batch()
             logits, loss = model(X, Y)
             losses[k] = loss.item()
-        out["test"] = losses.mean()
+        out["val"] = losses.mean()
         model.train()
         return out
 
@@ -55,8 +55,11 @@ if __name__ == "__main__":
         if iter % eval_interval == 0 or iter == max_iters - 1:
             losses = estimate_loss()
             print(
-                f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}"
+                f"step {iter}: val loss {losses['val']:.4f}"
             )
+        if iter % 1000 == 0 and iter > 1:
+            learning_rate /= 2
+            optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
         # sample a batch of data
         xb, yb = get_batch()
