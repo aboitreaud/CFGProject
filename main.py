@@ -16,8 +16,10 @@ if __name__ == "__main__":
     sentence_length = np.prod(cfg.T)
 
     config = GPTConfig(vocab_size=cfg.ns[-1], n_embd=384, n_head=6, n_layer=6)
-    model = GPT(config)
-    m = model.to(config.device)
+    m = GPT(config)
+    m = m.to(config.device)
+    m = torch.nn.DataParallel(m)
+    m.to(config.device)
     # print the number of parameters in the model
     print(sum(p.numel() for p in m.parameters()) / 1e6, "M parameters")
 
