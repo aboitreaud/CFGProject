@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from model import GPT, GPTConfig
+from model import GPT, GPTConfig, DataParallel
 from context_free_grammar import CFG
 from grammar import Grammar
 
@@ -17,14 +17,15 @@ if __name__ == "__main__":
 
     config = GPTConfig(vocab_size=cfg.ns[-1], n_embd=384, n_head=6, n_layer=6)
     m = GPT(config)
+    m = DataParallel(m)
     m.to(config.device)
 
     # print the number of parameters in the model
     print(sum(p.numel() for p in m.parameters()) / 1e6, "M parameters")
 
     # create a PyTorch optimizer
-    max_iters = 5000
-    eval_interval = 200
+    max_iters = 5
+    eval_interval = 20
     learning_rate = 3e-4
     optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 
@@ -45,7 +46,8 @@ if __name__ == "__main__":
         losses = torch.zeros(config.eval_iters)
         for k in range(config.eval_iters):
             X, Y = get_batch()
-            logits, loss = m(X, Y)
+            logits = m(X)
+            loss = torch.nn.functional.cross_entropy(logits.view(-1, logits.size(-1)), Y.view(-1), ignore_index=-1)
             losses[k] = loss.item()
         out["val"] = losses.mean()
         m.train()
@@ -66,8 +68,9 @@ if __name__ == "__main__":
         xb, yb = get_batch()
 
         # evaluate the loss
-        logits, loss = m(xb, yb)
+        logits = m(xb)
         optimizer.zero_grad(set_to_none=True)
+        loss = torch.nn.functional.cross_entropy(logits.view(-1, logits.size(-1)), yb.view(-1), ignore_index=-1)
         loss.backward()
         optimizer.step()
 
