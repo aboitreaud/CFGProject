@@ -27,9 +27,9 @@ if __name__ == "__main__":
     print(sum(p.numel() for p in m.parameters()) / 1e6, "M parameters")
 
     # create a PyTorch optimizer
-    max_iters = 2000
+    max_iters = 1500
     eval_interval = 250
-    eval_iters = 200
+    eval_iters = 100
     learning_rate = 3e-4
     optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 
@@ -64,7 +64,7 @@ if __name__ == "__main__":
             print(
                 f"step {iter}: val loss {losses['val']:.4f}"
             )
-        if iter % 1000 == 0 and iter > 1:
+        if iter % 400 == 0 and iter > 1:
             learning_rate /= 2
             optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 
