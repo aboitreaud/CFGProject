@@ -15,7 +15,6 @@ class GPTConfig:
     dropout: float = 0.0
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
     bias: bool = True  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    eval_iters: int = 20
 
 
 class LayerNorm(nn.Module):

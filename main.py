@@ -27,8 +27,9 @@ if __name__ == "__main__":
     print(sum(p.numel() for p in m.parameters()) / 1e6, "M parameters")
 
     # create a PyTorch optimizer
-    max_iters = 1
-    eval_interval = 1
+    max_iters = 2000
+    eval_interval = 250
+    eval_iters = 200
     learning_rate = 3e-4
     optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 
@@ -46,8 +47,8 @@ if __name__ == "__main__":
     def estimate_loss():
         out = {}
         m.eval()
-        losses = torch.zeros(config.eval_iters)
-        for k in range(config.eval_iters):
+        losses = torch.zeros(eval_iters)
+        for k in range(eval_iters):
             X, Y = get_batch()
             logits = m(X)
             loss = nn.functional.cross_entropy(logits.view(-1, logits.size(-1)), Y.view(-1), ignore_index=-1)
