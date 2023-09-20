@@ -1,6 +1,9 @@
+import time
+
 import torch
+import torch.nn as nn
 import numpy as np
-from model import GPT, GPTConfig, DataParallel
+from model import GPT, GPTConfig
 from context_free_grammar import CFG
 from grammar import Grammar
 
@@ -14,18 +17,18 @@ if __name__ == "__main__":
     # Flattened sentences are of length np.prod(T) product of length of the rules at each level
 
     sentence_length = np.prod(cfg.T)
-
+    start = time.time()
     config = GPTConfig(vocab_size=cfg.ns[-1], n_embd=384, n_head=6, n_layer=6)
     m = GPT(config)
-    m = DataParallel(m)
+    m = nn.DataParallel(m)
     m.to(config.device)
 
     # print the number of parameters in the model
     print(sum(p.numel() for p in m.parameters()) / 1e6, "M parameters")
 
     # create a PyTorch optimizer
-    max_iters = 5
-    eval_interval = 20
+    max_iters = 1
+    eval_interval = 1
     learning_rate = 3e-4
     optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 
@@ -47,7 +50,7 @@ if __name__ == "__main__":
         for k in range(config.eval_iters):
             X, Y = get_batch()
             logits = m(X)
-            loss = torch.nn.functional.cross_entropy(logits.view(-1, logits.size(-1)), Y.view(-1), ignore_index=-1)
+            loss = nn.functional.cross_entropy(logits.view(-1, logits.size(-1)), Y.view(-1), ignore_index=-1)
             losses[k] = loss.item()
         out["val"] = losses.mean()
         m.train()
@@ -70,18 +73,23 @@ if __name__ == "__main__":
         # evaluate the loss
         logits = m(xb)
         optimizer.zero_grad(set_to_none=True)
-        loss = torch.nn.functional.cross_entropy(logits.view(-1, logits.size(-1)), yb.view(-1), ignore_index=-1)
+        loss = nn.functional.cross_entropy(logits.view(-1, logits.size(-1)), yb.view(-1), ignore_index=-1)
         loss.backward()
         optimizer.step()
-
+    end1 = time.time()
+    model = m.module
     # generate n_gen sentences from the model and check their correctness
-    n_gen = 100
+    n_gen = 10
     context = torch.zeros((1, 1), dtype=torch.long, device=config.device)
     mistakes = []
     for i in range(n_gen):
-        gen_sentence = m.generate(context, max_new_tokens=sentence_length)[0].tolist()
+        gen_sentence = model.generate(context, max_new_tokens=sentence_length)[0].tolist()
         # remove root symbol at the beginning
         _, err = cfg.collapse_and_get_err(torch.tensor(gen_sentence[1:]).view(*cfg.T))
         mistakes.append(err)
     print(mistakes)
+    end2 = time.time()
+    print(end1 - start)
+    print(end2 - start)
+
 
