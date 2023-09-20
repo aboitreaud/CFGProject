@@ -13,10 +13,9 @@ class GPTConfig:
     n_embd: int = 768
     head_size = n_embd // n_head
     dropout: float = 0.0
-    device: str = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
     bias: bool = True  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     eval_iters: int = 200
-
 
 
 class LayerNorm(nn.Module):

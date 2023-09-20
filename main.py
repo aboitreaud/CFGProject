@@ -17,9 +17,8 @@ if __name__ == "__main__":
 
     config = GPTConfig(vocab_size=cfg.ns[-1], n_embd=384, n_head=6, n_layer=6)
     m = GPT(config)
-    m = m.to(config.device)
-    m = torch.nn.DataParallel(m)
     m.to(config.device)
+
     # print the number of parameters in the model
     print(sum(p.numel() for p in m.parameters()) / 1e6, "M parameters")
 
