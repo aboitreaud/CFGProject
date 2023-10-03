@@ -1,3 +1,4 @@
+import os
 import time
 
 import torch
@@ -8,6 +9,9 @@ from context_free_grammar import CFG
 from grammar import Grammar
 
 if __name__ == "__main__":
+    f = open("output.txt", "a")
+    f.write("\ni:")
+    f.close()
     cfg = CFG(L=3, ns=[1, 3, 3, 10], nr=[2, 2, 2], T=[8, 8, 8])
 
     nspl = 1000
@@ -27,10 +31,10 @@ if __name__ == "__main__":
     print(sum(p.numel() for p in m.parameters()) / 1e6, "M parameters")
 
     # create a PyTorch optimizer
-    max_iters = 1500
-    eval_interval = 250
-    eval_iters = 100
-    learning_rate = 3e-4
+    max_iters = 5000
+    eval_interval = 500
+    eval_iters = 200
+    learning_rate = 8e-4
     optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 
     # data loading
@@ -64,7 +68,7 @@ if __name__ == "__main__":
             print(
                 f"step {iter}: val loss {losses['val']:.4f}"
             )
-        if iter % 400 == 0 and iter > 1:
+        if iter % 500 == 0 and iter > 1:
             learning_rate /= 2
             optimizer = torch.optim.AdamW(m.parameters(), lr=learning_rate)
 
@@ -80,15 +84,20 @@ if __name__ == "__main__":
     end1 = time.time()
     model = m.module
     # generate n_gen sentences from the model and check their correctness
-    n_gen = 10
+    n_gen = 100
     context = torch.zeros((1, 1), dtype=torch.long, device=config.device)
     mistakes = []
     for i in range(n_gen):
         gen_sentence = model.generate(context, max_new_tokens=sentence_length)[0].tolist()
+        f = open("output.txt", "a")
+        f.write(f"\n{i}:")
+        f.write(str(gen_sentence))
         # remove root symbol at the beginning
         _, err = cfg.collapse_and_get_err(torch.tensor(gen_sentence[1:]).view(*cfg.T))
+        f.write(str(err))
+        f.write('\n')
+        f.close()
         mistakes.append(err)
-    print(mistakes)
     end2 = time.time()
     print(end1 - start)
     print(end2 - start)
