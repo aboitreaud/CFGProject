@@ -38,6 +38,13 @@ class CFG:
             self.rules.append(torch.randint(0, ns[l + 1], size=(ns[l], nr[l], T[l])))
             #print("Level {level} rule: {rule} with shape {shape}".format(level=l, rule=self.rules[-1], shape=self.rules[-1].shape))
 
+    def __str__(self):
+        attributes = []
+        for key, value in self.__dict__.items():
+            attributes.append(f"{key}={value}")
+
+        return "\n".join(attributes)
+
     ######################################################################
     # FUNCTIONS TO GENERATE A SEQUENCE OF SYMBOLS ACCORDING TO THE GRAMMAR
     ######################################################################
@@ -178,6 +185,71 @@ class CFG:
         err.reverse()
 
         return latent, err
+
+    def find_parent_symbol(self, seq, l):
+        """
+        seq is a sequence of symbol of level l+1. It has length T_l.
+        This function return the symbol of level l that generated this sequence (or None if no such symbol exists)
+        """
+
+        assert seq.shape[0] == self.T[l], "seq doesn't have the right length"
+        assert torch.all(seq < self.ns[l + 1]).item(), "some symbols in seq are too large"
+        l1_dist = torch.sum(torch.abs(self.rules[l] - seq.view(1, 1, -1)), dim=-1)  # (ns_l,nr_l)
+        indices = (l1_dist == 0).nonzero()
+        if indices.shape[0] > 0:
+            return indices[0, 0].item()
+        else:
+            return None
+
+    def collapse_symbols_one_level_exact(self, S, l):
+        """
+        This function uses rules of level l to coarsen symbols of level l+1 into symbols of level l
+        This is the inverse of the expand function.
+        INPUT:    S: LongTensor containing symbols from level l+1
+                     More specifically, S has shape (*,T_l) with entries in {0,1,...,ns_{l+1}-1}
+        OUTPUT:   S_coarsened: LongTensor containing symbols of level l (or None if cannot match)
+                               More specifically, S_coarsened has shape (*) with entries in {0,1,...,ns_{l}-1}
+        """
+
+        # suppose S has shape (T_0,T_1,T_2). We start by flattening it to have shape (T_0*T_1 , T_2)
+        S_flat = S.view(-1, S.shape[-1])
+
+        # For each of the T_0*T_1 sequences in S_flat we find the index of the symbol that generated it
+        S_coarsened = []
+        for seq in S_flat:
+            symbol = self.find_parent_symbol(seq, l)
+            if symbol is not None:
+                S_coarsened.append(symbol)
+            else:
+                return None
+
+        # We now reshape S_coarsened and error to have shape (T_0,T_1)
+        S_coarsened = torch.tensor(S_coarsened)
+        target_shape = S.shape[:-1]
+
+        return S_coarsened.view(target_shape)
+
+    def is_gramatically_correct(self, S):
+        """
+        S must have shape (T_0,T_1,...,T_{L-1}). It is a single sentence.
+        Return True if the sentence is grammatically correct.
+        """
+        for l in range(self.L - 1, -1, -1):
+            S = self.collapse_symbols_one_level_exact(S, l)
+            if S is None:
+                return False
+        return True
+
+    def frac_of_gramatically_correct_sentences(self, S):
+        """
+        S must have shape (num_sen, T_0,T_1,...,T_{L-1}). It is a BATCH of sentence.
+        """
+        num_sen = S.shape[0]
+        count = 0
+        for i in range(num_sen):
+            if self.is_gramatically_correct(S[i]):
+                count += 1
+        return count / num_sen
 
     def get_vocab_size(self):
         return self.ns[-1]
