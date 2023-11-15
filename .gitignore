@@ -1,2 +1,4 @@
 __pycache__/
 *.txt
+for_adrien/*
+*.ipynb filter=strip-notebook-output
