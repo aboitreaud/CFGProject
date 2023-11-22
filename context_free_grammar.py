@@ -38,13 +38,6 @@ class CFG:
             self.rules.append(torch.randint(0, ns[l + 1], size=(ns[l], nr[l], T[l])))
             #print("Level {level} rule: {rule} with shape {shape}".format(level=l, rule=self.rules[-1], shape=self.rules[-1].shape))
 
-    def __str__(self):
-        attributes = []
-        for key, value in self.__dict__.items():
-            attributes.append(f"{key}={value}")
-
-        return "\n".join(attributes)
-
     ######################################################################
     # FUNCTIONS TO GENERATE A SEQUENCE OF SYMBOLS ACCORDING TO THE GRAMMAR
     ######################################################################
