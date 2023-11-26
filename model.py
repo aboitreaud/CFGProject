@@ -2,16 +2,18 @@ import torch
 import torch.nn as nn
 import math
 from dataclasses import dataclass
+import inspect
 
 @dataclass
 class GPTConfig:
+    # n_embd is now the dimension of each individual head
     vocab_size: int = None
     block_size: int = 256
     batch_size: int = 256  # 64 on each GPU
     n_layer: int = 12
     n_head: int = 12
     n_embd: int = 768
-    head_size = n_embd // n_head
+    embed_dim_total = n_head * n_embd
     dropout: float = 0.0
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
     bias: bool = False  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
@@ -34,9 +36,9 @@ class Head(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.key = nn.Linear(config.n_embd, config.head_size, bias=False)
-        self.query = nn.Linear(config.n_embd, config.head_size, bias=False)
-        self.value = nn.Linear(config.n_embd, config.head_size, bias=False)
+        self.key = nn.Linear(config.embed_dim_total, config.n_embd, bias=False)
+        self.query = nn.Linear(config.embed_dim_total, config.n_embd, bias=False)
+        self.value = nn.Linear(config.embed_dim_total, config.n_embd, bias=False)
         self.register_buffer('tril', torch.tril(torch.ones(config.block_size, config.block_size)))
 
         self.dropout = nn.Dropout(config.dropout)
@@ -63,13 +65,13 @@ class MultiHeadAttention(nn.Module):
 
     def __init__(self, config:GPTConfig):
         super().__init__()
-        embed_dim_total = config.n_head * config.n_embd
-        self.heads = nn.MultiheadAttention(embed_dim=embed_dim_total,
+
+        self.heads = nn.MultiheadAttention(embed_dim=config.embed_dim_total,
                                            num_heads=config.n_head,
                                            dropout=config.dropout,
                                            batch_first=True
                                            )
-        self.proj = nn.Linear(embed_dim_total, config.n_embd)
+        self.proj = nn.Linear(config.embed_dim_total, config.n_embd)
 
     def forward(self, x):
         attn_output, _ = self.multihead_attn(x, x, x)
@@ -81,11 +83,11 @@ class MultiHeadAttention(nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config: GPTConfig):
         super().__init__()
-        self.c_fc = nn.Linear(config.n_embd, 4 * config.n_embd, bias=config.bias)
+        self.c_fc = nn.Linear(config.embed_dim_total, 4 * config.embed_dim_total, bias=config.bias)
         self.gelu = nn.GELU()
-        self.c_proj = nn.Linear(4 * config.n_embd, config.n_embd, bias=config.bias)
+        self.c_proj = nn.Linear(4 * config.embed_dim_total, config.embed_dim_total, bias=config.bias)
         self.dropout = nn.Dropout(config.dropout)
 
     def forward(self, x):
@@ -99,9 +101,9 @@ class MLP(nn.Module):
 class Block(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.ln_1 = LayerNorm(config.n_embd, bias=config.bias)
+        self.ln_1 = LayerNorm(config.embed_dim_total, bias=config.bias)
         self.attn = MultiHeadAttention(config)
-        self.ln_2 = LayerNorm(config.n_embd, bias=config.bias)
+        self.ln_2 = LayerNorm(config.embed_dim_total, bias=config.bias)
         self.mlp = MLP(config)
 
     def forward(self, x):
@@ -119,13 +121,13 @@ class GPT(nn.Module):
         self.config = config
 
         self.transformer = nn.ModuleDict(dict(
-            wte = nn.Embedding(config.vocab_size, config.n_embd),
-            wpe = nn.Embedding(config.block_size, config.n_embd),
+            wte = nn.Embedding(config.vocab_size, config.embed_dim_total),
+            wpe = nn.Embedding(config.block_size, config.embed_dim_total),
             drop = nn.Dropout(config.dropout),
             h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
-            ln_f = LayerNorm(config.n_embd, bias=config.bias),
+            ln_f = LayerNorm(config.embed_dim_total, bias=config.bias),
         ))
-        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+        self.lm_head = nn.Linear(config.embed_dim_total, config.vocab_size, bias=False)
         # with weight tying when using torch.compile() some warnings get generated:
         # "UserWarning: functional_call was passed multiple values for tied weights.
         # This behavior is deprecated and will be an error in future versions"
