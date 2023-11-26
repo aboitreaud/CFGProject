@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import math
 from dataclasses import dataclass
-import inspect
+
 
 @dataclass
 class GPTConfig:
