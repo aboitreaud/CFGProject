@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import math
 from dataclasses import dataclass
-import inspect
 
 @dataclass
 class GPTConfig:
@@ -62,15 +61,21 @@ class Head(nn.Module):
 class MultiHeadAttention(nn.Module):
     """ multiple heads of self-attention in parallel """
 
-    def __init__(self, config):
+    def __init__(self, config:GPTConfig):
         super().__init__()
-        self.heads = nn.ModuleList([Head(config) for _ in range(config.n_head)])
-        self.proj = nn.Linear(config.head_size * config.n_head, config.n_embd)
-        self.dropout = nn.Dropout(config.dropout)
+        embed_dim_total = config.n_head * config.n_embd
+        self.heads = nn.MultiheadAttention(embed_dim=embed_dim_total,
+                                           num_heads=config.n_head,
+                                           dropout=config.dropout,
+                                           batch_first=True
+                                           )
+        self.proj = nn.Linear(embed_dim_total, config.n_embd)
 
     def forward(self, x):
-        out = torch.cat([h(x) for h in self.heads], dim=-1)
-        out = self.dropout(self.proj(out))
+        attn_output, _ = self.multihead_attn(x, x, x)
+        # N.B: The dropout is applied in the MHA and not on the output of the projection
+        # out = self.dropout(self.proj(out))
+        out = self.proj(attn_output)
         return out
 
 
