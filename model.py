@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -13,10 +13,13 @@ class GPTConfig:
     n_layer: int = 12
     n_head: int = 12
     n_embd: int = 768
-    embed_dim_total = n_head * n_embd
+    embed_dim_total: int = field(init=False)
     dropout: float = 0.0
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
     bias: bool = False  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+
+    def __post_init__(self):
+        self.embed_dim_total = self.n_head * self.n_embd
 
 
 class LayerNorm(nn.Module):
