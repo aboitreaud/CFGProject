@@ -37,7 +37,7 @@ class LayerNorm(nn.Module):
 class MultiHeadAttention(nn.Module):
     """ multiple heads of self-attention in parallel """
 
-    def __init__(self, config:GPTConfig):
+    def __init__(self, config: GPTConfig):
         super().__init__()
 
         self.multihead_attn = nn.MultiheadAttention(
@@ -52,8 +52,8 @@ class MultiHeadAttention(nn.Module):
         attn_output, _ = self.multihead_attn(x, x, x)
         # N.B: The dropout is applied in the MHA and not on the output of the projection
         # out = self.dropout(self.proj(out))
-        out = self.proj(attn_output)
-        return out
+        # out = self.proj(attn_output)
+        return attn_output
 
 
 class MLP(nn.Module):
