@@ -249,18 +249,3 @@ class GPT(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1)
 
         return idx
-
-
-class SentenceGenerator(nn.Module):
-    def __init__(self, model, idx,  max_new_tokens, temperature=1.0, top_k=None):
-        super().__init__()
-        self.model = model
-        self.idx = idx
-        self.max_new_tokens = max_new_tokens
-        self.temperature = temperature
-        self.top_k = top_k
-
-    def forward(self):
-        g = self.model.generate(self.idx, self.max_new_tokens, self.temperature, self.top_k)
-        return g
-
