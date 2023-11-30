@@ -69,11 +69,12 @@ class MultiHeadAttention(nn.Module):
     def __init__(self, config:GPTConfig):
         super().__init__()
 
-        self.heads = nn.MultiheadAttention(embed_dim=config.embed_dim_total,
-                                           num_heads=config.n_head,
-                                           dropout=config.dropout,
-                                           batch_first=True
-                                           )
+        self.multihead_attn = nn.MultiheadAttention(
+            embed_dim=config.embed_dim_total,
+            num_heads=config.n_head,
+            dropout=config.dropout,
+            batch_first=True
+        )
         self.proj = nn.Linear(config.embed_dim_total, config.n_embd)
 
     def forward(self, x):
