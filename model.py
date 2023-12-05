@@ -39,17 +39,20 @@ class MultiHeadAttention(nn.Module):
 
     def __init__(self, config: GPTConfig):
         super().__init__()
-
+        self.n_head = config.n_head
         self.multihead_attn = nn.MultiheadAttention(
             embed_dim=config.embed_dim_total,
             num_heads=config.n_head,
             dropout=config.dropout,
             batch_first=True
         )
-        self.proj = nn.Linear(config.embed_dim_total, config.n_embd)
+
 
     def forward(self, x):
-        attn_output, _ = self.multihead_attn(x, x, x)
+        mask = torch.tril(torch.ones((x.size(1), x.size(1)), dtype=torch.bool, device=x.device))
+        mask = mask.unsqueeze(0).repeat(self.n_head * x.size(0), 1, 1).float()
+        mask = mask.masked_fill(mask == 0, float('-inf'))
+        attn_output, _ = self.multihead_attn(x, x, x, attn_mask=mask)
         # N.B: The dropout is applied in the MHA and not on the output of the projection
         # out = self.dropout(self.proj(out))
         # out = self.proj(attn_output)
