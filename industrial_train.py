@@ -117,13 +117,12 @@ def train(m):
     wandb.log({"Accuracy mean over 50 last epochs": np.mean(running_acc_mean[-50:])})
 
 
-## training content
-for layer in [1]:  # , 2, 3, 4, 5, 6]:
-    for head in [1, 2, 4, 6, 8, 12]:
-        for dim in [16, 32, 64, 128, 256]:
-            cfg = CFG(L=3, ns=[1, 3, 9, 10], nr=[2, 2, 2], T=[8, 8, 8])
-            sentence_length = np.prod(cfg.T)
-
+# training content
+cfg = CFG(L=3, ns=[1, 3, 9, 10], nr=[2, 2, 2], T=[8, 8, 8])
+sentence_length = np.prod(cfg.T)
+for layer in [2]:  # , 2, 3, 4, 5, 6]:
+    for head in [24]:
+        for dim in [8, 12, 16, 24, 32, 64, 128]:
             config = GPTConfig(vocab_size=cfg.ns[-1],
                                block_size=sentence_length - 1,
                                n_embd=dim,
