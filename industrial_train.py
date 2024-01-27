@@ -118,7 +118,7 @@ def train(m):
 
 
 # training content
-cfg = CFG(L=3, ns=[1, 3, 9, 10], nr=[2, 2, 2], T=[8, 8, 8])
+cfg = CFG(L=4, ns=[1, 3, 9, 9, 10], nr=[2, 2, 2, 2], T=[4, 4, 4, 8])
 sentence_length = np.prod(cfg.T)
 for layer in [2]:  # , 2, 3, 4, 5, 6]:
     for head in [24]:
