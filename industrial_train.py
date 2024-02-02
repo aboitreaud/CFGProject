@@ -118,11 +118,11 @@ def train(m):
 
 
 # training content
-cfg = CFG(L=5, ns=[1, 3, 3, 3, 3, 10], nr=[2, 2, 2, 2], T=[2, 2, 4, 4, 8])
+cfg = CFG(L=5, ns=[1, 3, 3, 3, 9, 10], nr=[2, 2, 2, 2, 2], T=[2, 2, 4, 4, 8])
 sentence_length = np.prod(cfg.T)
-for layer in [2]:  # , 2, 3, 4, 5, 6]:
-    for head in [24]:
-        for dim in [8, 12, 16, 24, 32, 64, 128]:
+for layer in [2]:
+    for head in [1, 2, 4, 8, 12]:
+        for dim in [8, 16, 32, 64, 128]:
             config = GPTConfig(vocab_size=cfg.ns[-1],
                                block_size=sentence_length - 1,
                                n_embd=dim,
@@ -155,7 +155,7 @@ for layer in [2]:  # , 2, 3, 4, 5, 6]:
                                    'architecture': f'GPT {million_params:.3f}M',
                                    'model': config,
                                    'grammar': cfg.__dict__}
-            wandb.init(project='CFG-Experiments', config=training_parameters,
+            wandb.init(project='CFG-HarderGrammar5', config=training_parameters,
                        name=f'{config.n_head}h {config.n_layer}l embd={config.n_embd} {million_params:.1f}M')
 
             wandb.watch(m, log='all')
