@@ -6,14 +6,16 @@ from context_free_grammar import CFG
 
 wandb.login()
 
-max_epochs = 200
+max_epochs = 1000
 batch_size = 5000
-n = 3
+eval_iters = 100
 
 # cfg = CFG(L=5, ns=[1, 3, 3, 3, 9, 10], nr=[2, 2, 2, 2, 2], T=[2, 2, 4, 4, 8])
-cfg = CFG(L=2, ns=[1, 3, 9], nr=[2, 2], T=[8, 8])
+cfg = CFG(L=3, ns=[1, 3, 9, 10], nr=[2, 2, 2], T=[8, 8, 8])
+
+n = 3
 m = NGramModel(n, cfg)
-eval_iters = 100
+
 test_set = cfg.sample_flattened(eval_iters)[0]
 
 
