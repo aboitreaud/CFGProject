@@ -10,17 +10,6 @@ class NGramModel:
         self.ngrams = defaultdict(lambda: defaultdict(int))
         self.cfg = cfg
 
-    def block_separated_ngrams(self, sentence):
-        assert sentence.size(1) == np.prod(self.cfg.T)
-        block_size = self.cfg.T[-1]
-
-        nb_blocks = np.prod(self.cfg.T) // block_size
-        for i in range(nb_blocks):
-            for j in range(self.n, block_size):
-                context = tuple(sentence[i*block_size+j-self.n-1: i*block_size+j].tolist())
-                next_token = sentence[i*block_size+j]
-                self.ngrams[context][next_token] += 1
-
     def simple_ngrams(self, sentence):
         assert sentence.size() == np.prod(self.cfg.T)
 
@@ -37,6 +26,7 @@ class NGramModel:
         next_tokens = list(self.ngrams[context].keys())
         probabilities = [self.ngrams[context][token] for token in next_tokens]
         if np.sum(probabilities) == 0:
+            print("Context not found in dict", context)
             next_token = np.random.randint(self.cfg.ns[-1])
         else:
             probabilities = np.array(probabilities) / np.sum(probabilities)
@@ -46,11 +36,12 @@ class NGramModel:
     def gen_sentence(self, context, sentence_length):
         # Given a tensor of contexts, complete them to form full sentences of size sentence_length
         n_gen = context.size(0)
+        context_len = context.size(1)
         sentences = torch.zeros(n_gen, sentence_length)
-        sentences[:, :context.size(1)] = context
+        sentences[:, :context_len] = context
         for s in range(n_gen):
-            for i in range(context.size(0), sentence_length):
-                context = sentences[s, i-self.n:i]
+            for i in range(context_len, sentence_length):
+                context = sentences[s, i-self.n + 1:i]
                 sentences[s, i] = self.predict_next_token(context)
         return sentences
 
