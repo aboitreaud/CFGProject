@@ -56,9 +56,15 @@ def train(model: NGramModel):
     # log the mean accuracy over the last 50 epochs
     wandb.log({"Accuracy mean over 50 last epochs": np.mean(running_acc_mean[-50:])})
 
-
-# TODO: Add more details on the config of the run
-wandb.init(project='CFG-ngram_first_try')
+conf = {'model.n': m.n,
+        'model.k_smoothing': k_smoothing,
+        'cfg': {'L': cfg.L,
+                'ns': cfg.ns,
+                'nr': cfg.nr,
+                'T': cfg.T},
+        'eval_iters': eval_iters,
+        'batch_size': batch_size}
+wandb.init(project='CFG-ngram_first_try', name=f'{m.n}-gram', config=conf)
 
 # wandb.watch(m, log='all')
 train(m)
