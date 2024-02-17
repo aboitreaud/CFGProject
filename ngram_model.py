@@ -49,13 +49,6 @@ class NGramModel:
             (sum(self.ngrams[context].values()) + (self.cfg.ns[-1] * self.smoothing_factor))
         return prob
 
-    def print_dict(self):
-        # Printing the defaultdict
-        for key_outer, inner_dict in self.ngrams.items():
-            print(f"Outer Key: {key_outer}")
-            for key_inner, value in inner_dict.items():
-                print(f"Inner Key: {key_inner}, Value: {value}")
-
     def compute_perplexity(self, test_set):
         total_log_prob = 0
         num_tokens = 0
@@ -75,3 +68,21 @@ class NGramModel:
 
         perplexity = np.exp(-total_log_prob / num_tokens)
         return perplexity
+
+    class HierarchicalNGram:
+
+        def __init__(self, cfg: CFG) -> None:
+            self.cfg = cfg
+            self.ngram = {lev: defaultdict(lambda: defaultdict(int)) for lev in range(self.cfg.L)}
+
+        def simple_ngrams(self, sentence):
+            for lev in range(self.cfg.L - 1, -1, -1):
+                n = self.cfg.T[lev]
+                assert sentence.size() == np.prod(self.cfg.T[:lev])
+
+                # Generate n-grams and count occurrences
+                for i in range(len(sentence) - n + 1):
+                    ngram = sentence[i:i+n]
+                    context = tuple(ngram[:-1].tolist())
+                    next_token = ngram[-1].item()
+                    self.ngrams[context][next_token] += 1
