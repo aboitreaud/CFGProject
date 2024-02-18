@@ -69,35 +69,58 @@ class NGramModel:
         perplexity = np.exp(-total_log_prob / num_tokens)
         return perplexity
 
-    class HierarchicalNGram:
 
-        def __init__(self, cfg: CFG) -> None:
-            self.cfg = cfg
-            self.ngram = {lev: defaultdict(lambda: defaultdict(int)) for lev in range(self.cfg.L)}
-            # counter for attributing new symbols at each level
-            self.symbol_counters = {lev: 0 for lev in range(self.cfg.L)}
+class NgramEntry:
+    def __init__(self, context) -> None:
+        self.context = context
+        self.next_tokens = defaultdict(int)
+        self.upper_level_symbol = -1
 
-        def simple_ngrams(self, sentence):
-            for lev in range(self.cfg.L - 1, -1, -1):
-                n = self.cfg.T[lev]
-                assert sentence.size() == np.prod(self.cfg.T[:lev])
-                upper_level_sentence = torch.zeros(sentence.size()//n)
-                # Generate n-grams and count occurrences
-                j = 0
-                for i in range(0, len(sentence) - n + 1, n):
-                    context = tuple(sentence[i:i+n].tolist())
-                    next_group = tuple(sentence[i+n, i+2*n].tolist())
-                    self.ngrams[context][next_group] += 1
+    def __str__(self) -> str:
+        s = f"Context: {self.context} \n Upper-level-symbol: {self.upper_level_symbol}"
+        return s
 
-                    # Get the upper level symbol corresponsing to context
-                    upper_level_symbol = self.ngram[lev].get(context, -1)
+    def __repr__(self) -> str:
+        s = f"Context: {self.context},  Upper-level-symbol: {self.upper_level_symbol}, "
+        s += f"Next tokens: {self.next_tokens}"
+        return s
 
-                    # In case this group of n symbols at level lev has never been seen,
-                    # map it to a new upper level symbol and increment the new symbol counter
-                    if upper_level_symbol == -1:
-                        upper_level_symbol = self.symbol_counters[lev]
-                        self.symbol_counters[lev] += 1
-                    # Append it to the upper-level sentence
-                    upper_level_sentence[j] = upper_level_symbol
-                    j += 1
-                sentence = upper_level_sentence
+
+class HierarchicalNGram:
+
+    def __init__(self, cfg: CFG) -> None:
+        self.cfg = cfg
+        self.ngrams = {lev: {} for lev in range(self.cfg.L)}
+        # counter for attributing new symbols at each level
+        self.symbol_counters = {lev: 0 for lev in range(self.cfg.L)}
+
+    def simple_ngrams(self, sentence):
+        for lev in range(self.cfg.L - 1, -1, -1):
+            n = self.cfg.T[lev]
+            assert sentence.size() == np.prod(self.cfg.T[:lev+1])
+            upper_level_sentence = torch.zeros(sentence.size(0)//n)
+            # Generate n-grams and count occurrences
+            j = 0
+            for i in range(0, len(sentence) - n + 1, n):
+                context = tuple(sentence[i:i+n].tolist())
+                next_group = tuple(sentence[i+n: i+2*n].tolist())
+
+                curr = self.ngrams[lev].get(context, NgramEntry(context))
+
+                # Increment the next-group counter for the current context
+                curr.next_tokens[next_group] += 1
+
+                # In case this group of n symbols at level lev has never been seen,
+                # map it to a new upper level symbol and increment the new symbol counter
+                if curr.upper_level_symbol == -1:
+                    curr.upper_level_symbol = self.symbol_counters[lev]
+                    self.symbol_counters[lev] += 1
+                # Append it to the upper-level sentence
+                upper_level_sentence[j] = curr.upper_level_symbol
+
+                # Put the element in the dict
+                self.ngrams[lev][context] = curr
+                j += 1
+            print(f"Finished level{lev}")
+            print(sentence)
+            sentence = upper_level_sentence
