@@ -4,21 +4,6 @@ import numpy as np
 from ngram_model import NGramModel, HierarchicalNGram
 from context_free_grammar import CFG
 
-wandb.login()
-
-max_epochs = 200
-batch_size = 5000
-eval_iters = 100
-
-# cfg = CFG(L=5, ns=[1, 3, 3, 3, 9, 10], nr=[2, 2, 2, 2, 2], T=[2, 2, 4, 4, 8])
-cfg = CFG(L=2, ns=[1, 9, 10], nr=[2, 2], T=[8, 8])
-
-n = 9
-k_smoothing = 0.1
-m = NGramModel(n, k_smoothing, cfg)
-
-test_set = cfg.sample_flattened(eval_iters)[0]
-
 
 def train_regular_ngram(model: NGramModel):
     running_acc_mean = []
@@ -91,16 +76,27 @@ def train_hierarchical_ngram(model: HierarchicalNGram):
     wandb.log({"Accuracy mean over 50 last epochs": np.mean(running_acc_mean[-50:])})
 
 
-conf = {'model.n': m.n,
-        'model.k_smoothing': k_smoothing,
-        'cfg': {'L': cfg.L,
+wandb.login()
+max_epochs = 200
+batch_size = 5000
+eval_iters = 100
+
+# cfg = CFG(L=5, ns=[1, 3, 3, 3, 9, 10], nr=[2, 2, 2, 2, 2], T=[2, 2, 4, 4, 8])
+cfg = CFG(L=2, ns=[1, 9, 10], nr=[2, 2], T=[8, 8])
+
+# n = 9
+# k_smoothing = 0.1
+m = HierarchicalNGram(cfg)
+
+test_set = cfg.sample_flattened(eval_iters)[0]
+
+conf = {'cfg': {'L': cfg.L,
                 'ns': cfg.ns,
                 'nr': cfg.nr,
                 'T': cfg.T},
         'eval_iters': eval_iters,
         'batch_size': batch_size}
-wandb.init(project='CFG-ngram_first_try', name=f'{m.n}-gram {cfg.L} levels {cfg.nr} rules', config=conf)
+wandb.init(project='CFG-cheating-ngram', name=f'{cfg.L} levels {cfg.nr} rules', config=conf)
 
-# wandb.watch(m, log='all')
-train(m)
+train_hierarchical_ngram(m)
 wandb.finish()
