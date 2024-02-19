@@ -92,9 +92,10 @@ class HierarchicalNGram:
         # Mapping between groups of symbols at level i and (arbitrarily) chosen symbols at level i+1
         self.ngrams = {lev: {} for lev in range(self.cfg.L-1)}
         # Mapping between symbols at level i and groups of symbols of level i-1, used for generation
-        self.reverse_dict = {lev: {} for lev in range(1, self.cfg.L)}
+        self.reverse_dict = {lev: {} for lev in range(self.cfg.L)}
         # Counter for attributing new symbols at each level
         self.symbol_counters = {lev: 0 for lev in range(self.cfg.L)}
+        self.root_expansion_freq = defaultdict(int)
 
     def simple_ngrams(self, sentence):
         for lev in range(self.cfg.L-1):
@@ -128,3 +129,20 @@ class HierarchicalNGram:
             print(f"Finished level{lev}")
             sentence = upper_level_sentence
             print(sentence)
+        # Add the second to last level sentence to the root expansion dict
+        self.root_expansion_freq[tuple(sentence.tolist())] += 1
+
+    def generate_sentence(self):
+        # Randomly choose below-root level sequence
+        prob = [self.root_expansion_freq[c] / sum(self.root_expansion_freq.values())
+                for c in self.root_expansion_freq.keys()]
+        idx = np.random.choice(len(self.root_expansion_freq), p=prob)
+        seq = list(self.root_expansion_freq.keys())[idx]
+
+        # Expand that sequence until the leaf level
+        for lev in range(self.cfg.L - 1, 0, -1):
+            next_level_seq = []
+            for symbol in seq:
+                next_level_seq += list(self.reverse_dict[lev][symbol])
+            seq = next_level_seq
+        return torch.tensor(seq)
