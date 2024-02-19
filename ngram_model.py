@@ -70,20 +70,6 @@ class NGramModel:
         return perplexity
 
 
-class NgramEntry:
-    def __init__(self, context) -> None:
-        self.next_tokens = defaultdict(int)
-        self.upper_level_symbol = -1
-
-    def __str__(self) -> str:
-        s = f"Next tokens: {self.next_tokens}, Upper-level-symbol: {self.upper_level_symbol}"
-        return s
-
-    def __repr__(self) -> str:
-        s = f"Next tokens: {self.next_tokens}, Upper-level-symbol: {self.upper_level_symbol}"
-        return s
-
-
 class HierarchicalNGram:
 
     def __init__(self, cfg: CFG) -> None:
@@ -146,3 +132,17 @@ class HierarchicalNGram:
                 next_level_seq += list(self.reverse_dict[lev][symbol])
             seq = next_level_seq
         return torch.tensor(seq)
+
+
+class NgramEntry:
+    def __init__(self, context) -> None:
+        self.next_tokens = defaultdict(int)
+        self.upper_level_symbol = -1
+
+    def __str__(self) -> str:
+        s = f"Next tokens: {self.next_tokens}, Upper-level-symbol: {self.upper_level_symbol}"
+        return s
+
+    def __repr__(self) -> str:
+        s = f"Next tokens: {self.next_tokens}, Upper-level-symbol: {self.upper_level_symbol}"
+        return s
