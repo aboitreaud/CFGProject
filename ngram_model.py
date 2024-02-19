@@ -99,7 +99,8 @@ class HierarchicalNGram:
     def simple_ngrams(self, sentence):
         for lev in range(self.cfg.L-1):
             n = self.cfg.T[lev]
-            assert sentence.size() == np.prod(self.cfg.T[:lev+1])
+            # TODO: check in the CFG code how T is ordered [4,2] != [2,4] for e.g.
+            assert sentence.size() == np.prod(self.cfg.T[lev:])
             upper_level_sentence = torch.zeros(sentence.size(0)//n)
             # Generate n-grams and count occurrences
             j = 0
@@ -120,8 +121,9 @@ class HierarchicalNGram:
                 # Append it to the upper-level sentence
                 upper_level_sentence[j] = curr.upper_level_symbol
 
-                # Put the element in the dict
+                # Put the element in both dicts
                 self.ngrams[lev][context] = curr
+                self.reverse_dict[lev+1][curr.upper_level_symbol] = context
                 j += 1
             print(f"Finished level{lev}")
             sentence = upper_level_sentence
