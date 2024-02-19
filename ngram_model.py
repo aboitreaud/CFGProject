@@ -72,17 +72,15 @@ class NGramModel:
 
 class NgramEntry:
     def __init__(self, context) -> None:
-        self.context = context
         self.next_tokens = defaultdict(int)
         self.upper_level_symbol = -1
 
     def __str__(self) -> str:
-        s = f"Context: {self.context} \n Upper-level-symbol: {self.upper_level_symbol}"
+        s = f"Next tokens: {self.next_tokens}, Upper-level-symbol: {self.upper_level_symbol}"
         return s
 
     def __repr__(self) -> str:
-        s = f"Context: {self.context},  Upper-level-symbol: {self.upper_level_symbol}, "
-        s += f"Next tokens: {self.next_tokens}"
+        s = f"Next tokens: {self.next_tokens}, Upper-level-symbol: {self.upper_level_symbol}"
         return s
 
 
@@ -90,12 +88,16 @@ class HierarchicalNGram:
 
     def __init__(self, cfg: CFG) -> None:
         self.cfg = cfg
-        self.ngrams = {lev: {} for lev in range(self.cfg.L)}
-        # counter for attributing new symbols at each level
+        # Leaves are considered level 0 of the grammar, root is level L
+        # Mapping between groups of symbols at level i and (arbitrarily) chosen symbols at level i+1
+        self.ngrams = {lev: {} for lev in range(self.cfg.L-1)}
+        # Mapping between symbols at level i and groups of symbols of level i-1, used for generation
+        self.reverse_dict = {lev: {} for lev in range(1, self.cfg.L)}
+        # Counter for attributing new symbols at each level
         self.symbol_counters = {lev: 0 for lev in range(self.cfg.L)}
 
     def simple_ngrams(self, sentence):
-        for lev in range(self.cfg.L - 1, -1, -1):
+        for lev in range(self.cfg.L-1):
             n = self.cfg.T[lev]
             assert sentence.size() == np.prod(self.cfg.T[:lev+1])
             upper_level_sentence = torch.zeros(sentence.size(0)//n)
@@ -122,5 +124,5 @@ class HierarchicalNGram:
                 self.ngrams[lev][context] = curr
                 j += 1
             print(f"Finished level{lev}")
-            print(sentence)
             sentence = upper_level_sentence
+            print(sentence)
