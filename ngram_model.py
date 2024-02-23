@@ -117,20 +117,29 @@ class HierarchicalNGram:
         # Add the second to last level sentence to the root expansion dict
         self.root_expansion_freq[tuple(sentence.tolist())] += 1
 
-    def generate_sentence(self):
-        # Randomly choose below-root level sequence
-        prob = [self.root_expansion_freq[c] / sum(self.root_expansion_freq.values())
-                for c in self.root_expansion_freq.keys()]
-        idx = np.random.choice(len(self.root_expansion_freq), p=prob)
-        seq = list(self.root_expansion_freq.keys())[idx]
+    def generate_sentence(self, nspl, verbose=False):
+        sentences = torch.zeros((nspl, np.prod(self.cfg.T)))
+        for iter in range(nspl):
+            # Randomly choose below-root level sequence
+            prob = [self.root_expansion_freq[c] / sum(self.root_expansion_freq.values())
+                    for c in self.root_expansion_freq.keys()]
+            idx = np.random.choice(len(self.root_expansion_freq), p=prob)
+            seq = list(self.root_expansion_freq.keys())[idx]
 
-        # Expand that sequence until the leaf level
-        for lev in range(self.cfg.L - 1, 0, -1):
-            next_level_seq = []
-            for symbol in seq:
-                next_level_seq += list(self.reverse_dict[lev][symbol])
-            seq = next_level_seq
-        return torch.tensor(seq)
+            # Expand that sequence until the leaf level
+            for lev in range(self.cfg.L - 1, 0, -1):
+                if verbose:
+                    print("Expanding level", lev)
+                next_level_seq = []
+                for symbol in seq:
+                    random_idx = np.random.randint(0, int(self.cfg.nr[lev]))
+                    if verbose:
+                        print(random_idx, self.reverse_dict[lev][symbol])
+                    next_level_seq += list(self.reverse_dict[lev][symbol][random_idx])
+                seq = next_level_seq
+            sentences[iter, :] = torch.tensor(seq)
+        return sentences
+
     def get_upper_level_symbol(self, lev, group):
         if group == ():
             return -1
