@@ -132,10 +132,10 @@ class HierarchicalNGram:
                     print("Expanding level", lev)
                 next_level_seq = []
                 for symbol in seq:
-                    random_idx = np.random.randint(0, int(self.cfg.nr[lev]))
+                    random_idx = np.random.randint(0, len(self.reverse_dict[lev][symbol]))
                     if verbose:
                         print(random_idx, self.reverse_dict[lev][symbol])
-                    next_level_seq += list(self.reverse_dict[lev][symbol][random_idx])
+                    next_level_seq += [self.reverse_dict[lev][symbol][random_idx]]
                 seq = next_level_seq
             sentences[iter, :] = torch.tensor(seq)
         return sentences
@@ -161,13 +161,13 @@ class HierarchicalNGram:
             temp = {self.get_upper_level_symbol(lev-1, g): self.ngrams[lev-1][group].next_tokens[g]
                     for g in self.ngrams[lev-1][group].next_tokens.keys()}
             d[up] = dict(sorted(temp.items(), key=lambda x: x[0]))
+
         # Transform that dict into an array
         # There are self.cfg.ns[lev] * self.cfg.nr[lev] + 1 possible symbols including the termination empty tuple ()
         vectors = np.zeros((len(d), self.cfg.ns[lev] * self.cfg.nr[lev] + 1))
         for row in d.items():
             for i in row[1].keys():
                 vectors[row[0], i] = row[1][i]
-
         kmeans = KMeans(n_clusters=self.cfg.ns[lev], n_init='auto', random_state=0)
         kmeans.fit(vectors)
         cluster_labels = kmeans.labels_
