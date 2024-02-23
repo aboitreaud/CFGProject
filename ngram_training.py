@@ -50,7 +50,7 @@ def train_hierarchical_ngram(model: HierarchicalNGram):
         sentences = cfg.sample_flattened(batch_size)[0]
         for s in range(sentences.size(1)):
             model.simple_ngrams(sentences[0, s, :])
-        for lev in range(1, m.cfg.L):
+        for lev in range(m.cfg.L - 1, 0, -1):  # Starting from the bottom of the tree (leaves)
             m.compress_upper_level(lev)
         gen_sentences = model.generate_sentence(eval_iters, verbose=False)
         gen_sentences = gen_sentences.view([eval_iters] + cfg.T)
