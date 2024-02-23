@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from collections import defaultdict
 from context_free_grammar import CFG
+from sklearn.cluster import KMeans
 
 
 class NGramModel:
@@ -130,6 +131,59 @@ class HierarchicalNGram:
                 next_level_seq += list(self.reverse_dict[lev][symbol])
             seq = next_level_seq
         return torch.tensor(seq)
+    def get_upper_level_symbol(self, lev, group):
+        if group == ():
+            return -1
+        else:
+            return self.ngrams[lev][group].upper_level_symbol
+
+    def compress_upper_level(self, lev):
+        # Going up the cfg tree from level lev+1 to level lev, we have created ns[l] * nr[l] symbols
+        # There should only be ns[l] of them
+        # This functions reduces the number of upper-level symbols from ns[l] * nr[l] to ns[l]
+        # by applying K Means clustering on the dictionary of T[l+1]-grams of level l+1,
+        # in which the groups of symbols are replaced by their upper-level symbol,
+        # and looking for ns[l] clusters, we can match the identical symbols from level l.
+
+        # Start by transforming the n-grams from level lev+1 into a dict of level lev symbols
+        d = {}
+        for group in self.ngrams[lev-1].keys():
+            up = self.get_upper_level_symbol(lev-1, group)
+            temp = {self.get_upper_level_symbol(lev-1, g): self.ngrams[lev-1][group].next_tokens[g]
+                    for g in self.ngrams[lev-1][group].next_tokens.keys()}
+            d[up] = dict(sorted(temp.items(), key=lambda x: x[0]))
+        # Transform that dict into an array
+        # There are self.cfg.ns[lev] * self.cfg.nr[lev] + 1 possible symbols including the termination empty tuple ()
+        vectors = np.zeros((len(d), self.cfg.ns[lev] * self.cfg.nr[lev] + 1))
+        for row in d.items():
+            for i in row[1].keys():
+                vectors[row[0], i] = row[1][i]
+
+        kmeans = KMeans(n_clusters=self.cfg.ns[lev], n_init='auto', random_state=0)
+        kmeans.fit(vectors)
+        cluster_labels = kmeans.labels_
+
+        # Update reverse_dict
+        temp = {i: [] for i in range(self.cfg.ns[lev])}
+        for old_symbol in self.reverse_dict[lev].keys():
+            new_symbol = cluster_labels[old_symbol]
+            temp[new_symbol].append(self.reverse_dict[lev][old_symbol])
+        self.reverse_dict[lev] = temp
+
+        # Update ngrams
+        for ngram in self.ngrams[lev-1].keys():
+            old_symbol = self.get_upper_level_symbol(lev-1, ngram)
+            self.ngrams[lev-1][ngram].upper_level_symbol = cluster_labels[old_symbol]
+
+        # If we are compressing below-root level, also update the stored root expansion sequences
+        if lev == self.cfg.L - 1:
+            new_dict = defaultdict(int)
+            for old_seq in self.root_expansion_freq.keys():
+                new_seq = []
+                for s in old_seq:
+                    new_seq.append(cluster_labels[int(s)])
+                new_dict[tuple(new_seq)] += self.root_expansion_freq[old_seq]
+            self.root_expansion_freq = new_dict
 
 
 class NgramEntry:
