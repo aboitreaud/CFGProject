@@ -136,7 +136,7 @@ class HierarchicalNGram:
                     if verbose:
                         print(random_idx, self.reverse_dict[lev][symbol])
                     next_level_seq += [self.reverse_dict[lev][symbol][random_idx]]
-                seq = next_level_seq
+                seq = np.array(next_level_seq).reshape(-1)
             sentences[iter, :] = torch.tensor(seq)
         return sentences
 
