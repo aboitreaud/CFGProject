@@ -17,6 +17,7 @@
 # %%
 import numpy as np
 import torch
+from context_free_grammar import CFG
 
 
 # %%
@@ -49,8 +50,14 @@ class SynonymFinder:
 
         return distance
     
-    def find_synonyms(self, sentence1, sentence2):
-        pass
+    def find_synonyms(self, sentence1, sentence2, word_size):
+        # Initialize list to store the tuples of synonyms 
+        synonyms = []
+
+        for c1, c2 in zip(sentence1.split(word_size), sentence2.split(word_size)):
+            if torch.any(c1 != c2):
+                return (c1, c2)
+        
     
     def apply_synonym_change(self, synonym1, synonym2, corpus):
         """
