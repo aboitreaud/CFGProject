@@ -70,23 +70,21 @@ class SynonymFinder:
         Returns:
             torch.Tensor: The modified sentences with the synonym2 replaced with synonym1 in every sentences.
         """
+        s = torch.zeros_like(sentences)
         if synonyms is not None:
             (synonym1, synonym2) = synonyms
             # Check if the synonyms are valid
             assert len(synonym1) == len(synonym2), "Synonyms must have the same length"
             assert synonym1.dim() == 1 and synonym2.dim() == 1, "Synonyms must be 1-dimensional"
             word_size = synonym1.size(0)
-            for i, sentence in enumerate(sentences):
-                # Find the starting index of the subsection, if it exists
-                synonym_positions = (sentence.unfold(0, word_size, word_size) == synonym2.unsqueeze(0)).all(dim=1).squeeze().nonzero().squeeze(1)
-                
-                # Replace the subsection with zeros if found
-                for start_idx in synonym_positions:
-                    start_idx *= word_size
-                    end_idx = start_idx + word_size
-                    sentence[start_idx:end_idx] = synonym1
-                    sentences[i] = sentence
-        return sentences
+            s = torch.zeros_like(sentences)
+            for i in range(sentences.size(0)):
+                words = list(sentences[i].split(word_size))
+                for j, word in enumerate(words):
+                    if word.equal(synonym2):
+                        words[j] = synonym1
+                s[i] = torch.cat(list(words))
+        return s
 
 # %%
 s = SynonymFinder()
@@ -94,11 +92,12 @@ cfg = CFG(L=2, ns=[1, 9, 10], nr=[2, 2], T=[8, 8])
 sentences = cfg.sample_flattened(50)[0].squeeze(0)
 
 min_dist_pair = (-2, -2)
+iter = 0
 while min_dist_pair != (-1, -1):
     min_dist_pair = s.find_closest_sentences(sentences, 1, 8)
-    print(sentences[min_dist_pair[0]])
-    print(sentences[min_dist_pair[1]])
     synonyms = s.find_synonyms(sentences[min_dist_pair[0]], sentences[min_dist_pair[1]], 8)
-    print(synonyms)
     sentences = s.apply_synonyms_change(synonyms, sentences)
-    print(min_dist_pair)
+    iter += 1
+print(iter)
+
+# %%
