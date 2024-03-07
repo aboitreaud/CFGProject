@@ -23,16 +23,20 @@ from context_free_grammar import CFG
 # %%
 class SynonymFinder:
 
-    def find_closest_sentences(self, corpus):
-        min_dist = 512*10
+    def find_closest_sentences(self, sentences, nb_allowed_differing_words, word_size):
+        min_dist = sentences.size(0)*10
         min_dist_pair = (-1, -1)
-        nb_sentences = corpus.size(0)
+        nb_sentences = sentences.size(0)
         for i in range(nb_sentences):
             for j in range(i+1, nb_sentences):
-                dist = self.hamming_distance(corpus[i], corpus[j])
-                if dist < min_dist:
-                    min_dist = dist
-                    min_dist_pair = (i,j)
+                dist = self.hamming_distance(sentences[i], sentences[j])
+                if   0 < dist < min_dist: # We are not interested in exact same sentences
+                    # Check how many words are different in the two sentences
+                    diff_mask = torch.ne(sentences[i], sentences[j])
+                    num_differing_items = diff_mask.sum().item()
+                    if num_differing_items <= nb_allowed_differing_words * word_size:
+                        min_dist = dist
+                        min_dist_pair = (i,j)
         return min_dist_pair
 
     def hamming_distance(self, vec1, vec2):
