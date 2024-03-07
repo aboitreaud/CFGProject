@@ -22,6 +22,12 @@ from context_free_grammar import CFG
 
 # %%
 class CFGBacktracker:
+    def __init__(self, cfg) -> None:
+        self.cfg = cfg
+
+        # for each level, we store the 
+        self.backtracked_rules = [{} for _ in range(self.cfg.L)]
+
 
     def find_closest_sentences(self, sentences, nb_allowed_differing_words, word_size):
         min_dist = sentences.size(0)*10
@@ -86,17 +92,25 @@ class CFGBacktracker:
                 new_sentences[i] = torch.cat(list(words))
             return new_sentences
         return sentences
-    def merge_sentences(self, sentences):
+    
+    def store_level_rules(self, sentences, level):
+        # Find synonyms at current level
         min_dist_pair = (-2, -2)
         iter = 0
-        s = []
+        pairs_of_synonyms = []
         while min_dist_pair != (-1, -1):
             min_dist_pair = self.find_closest_sentences(sentences, 1, 8)
             synonyms = self.find_synonyms(sentences[min_dist_pair[0]], sentences[min_dist_pair[1]], 8)
-            s.append(synonyms)
+            pairs_of_synonyms.append(synonyms)
+            # Modifiy sentences by merging synonyms
             sentences = self.apply_synonyms_change(synonyms, sentences)
             iter += 1
-        return iter, s, sentences
+        # Store rules by arbitrarily attributing groups of synonyms a word of the level above
+        rules_dict = dict()
+        for i in range(len(pairs_of_synonyms)):
+            rules_dict[i] = pairs_of_synonyms[i]
+        self.backtracked_rules[level] = rules_dict
+        return iter, pairs_of_synonyms, sentences
 
 # %%
 backtracker = CFGBacktracker()
