@@ -90,17 +90,15 @@ class SynonymFinder:
 
 # %%
 s = SynonymFinder()
+cfg = CFG(L=2, ns=[1, 9, 10], nr=[2, 2], T=[8, 8])
+sentences = cfg.sample_flattened(50)[0].squeeze(0)
 
-# %%
-# Example usage
-vectors = np.random.randint(0, 10, size=(5, 512))
-
-# %%
-
-# %%
-print(min_dist_pair)
-
-# %%
-min_dist
-
-# %%
+min_dist_pair = (-2, -2)
+while min_dist_pair != (-1, -1):
+    min_dist_pair = s.find_closest_sentences(sentences, 1, 8)
+    print(sentences[min_dist_pair[0]])
+    print(sentences[min_dist_pair[1]])
+    synonyms = s.find_synonyms(sentences[min_dist_pair[0]], sentences[min_dist_pair[1]], 8)
+    print(synonyms)
+    sentences = s.apply_synonyms_change(synonyms, sentences)
+    print(min_dist_pair)
