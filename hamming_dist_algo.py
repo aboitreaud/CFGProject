@@ -63,31 +63,30 @@ class SynonymFinder:
                 return (c1, c2)
         
     
-    def apply_synonym_change(self, synonym1, synonym2, corpus):
+    def apply_synonyms_change(self, synonyms, sentences):
         """
-        Replaces the synonym2 subsections in the sentences with synonym1.
-        
-        Args:
-            tensor (torch.Tensor): The input tensor of length 512.
-            subsection (torch.Tensor): The subsection tensor of length 8 to search for.
+        Replaces the synonyms[1] subsections in all sentences with synonyms[0].
             
         Returns:
-            torch.Tensor: The modified corpus with the synonym2 replaced with synonym1 in every sentences.
+            torch.Tensor: The modified sentences with the synonym2 replaced with synonym1 in every sentences.
         """
-        for sentence in corpus:
-            # Check if the subsection tensor is valid
+        if synonyms is not None:
+            (synonym1, synonym2) = synonyms
+            # Check if the synonyms are valid
             assert len(synonym1) == len(synonym2), "Synonyms must have the same length"
             assert synonym1.dim() == 1 and synonym2.dim() == 1, "Synonyms must be 1-dimensional"
-            
-            # Find the starting index of the subsection, if it exists
-            start_idx = (sentence.unfold(0, 8) == synonym2.unsqueeze(0)).all(dim=2).squeeze().nonzero().squeeze(1)
-            
-            # Replace the subsection with zeros if found
-            if start_idx.numel() > 0:
-                end_idx = start_idx + 8
-                sentence[start_idx:end_idx] = synonym1
-            
-        return corpus
+            word_size = synonym1.size(0)
+            for i, sentence in enumerate(sentences):
+                # Find the starting index of the subsection, if it exists
+                synonym_positions = (sentence.unfold(0, word_size, word_size) == synonym2.unsqueeze(0)).all(dim=1).squeeze().nonzero().squeeze(1)
+                
+                # Replace the subsection with zeros if found
+                for start_idx in synonym_positions:
+                    start_idx *= word_size
+                    end_idx = start_idx + word_size
+                    sentence[start_idx:end_idx] = synonym1
+                    sentences[i] = sentence
+        return sentences
 
 # %%
 s = SynonymFinder()
