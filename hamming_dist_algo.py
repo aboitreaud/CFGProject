@@ -136,7 +136,7 @@ class CFGBacktracker:
             if len(pairs_of_synonyms) == 0:
                 print(f"Failed finding synonyms, no sentence in the corpus differs by only one word, stopping at level {lev}")
                 return
-            word_to_upper_level_symbol = self.store_level_rules(sentences, lev)
+            word_to_upper_level_symbol = self.store_rules(sentences, lev)
             sentences = self.build_upper_level_seq(lev, word_to_upper_level_symbol)
             print(sentences)
 # %%
