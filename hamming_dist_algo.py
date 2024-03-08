@@ -28,7 +28,6 @@ class CFGBacktracker:
         # for each level, we store the 
         self.backtracked_rules = [{} for _ in range(self.cfg.L)]
 
-
     def find_closest_sentences(self, sentences, nb_allowed_differing_words, word_size):
         min_dist = self.hamming_distance(sentences[0], sentences[1])
         min_dist_pair = (-1, -1)
@@ -36,7 +35,7 @@ class CFGBacktracker:
         for i in range(nb_sentences):
             for j in range(i+1, nb_sentences):
                 dist = self.hamming_distance(sentences[i], sentences[j])
-                if   0 < dist < min_dist: # We are not interested in exact same sentences
+                if 0 < dist < min_dist: # We are not interested in exact same sentences
                     # Check how many words are different in the two sentences
                     diff_mask = torch.ne(sentences[i], sentences[j])
                     num_differing_items = diff_mask.sum().item()
@@ -59,7 +58,7 @@ class CFGBacktracker:
         distance = sum(c1 != c2 for c1, c2 in zip(bin_vec1, bin_vec2))
 
         return distance
-    
+
     def find_synonyms(self, sentence1, sentence2, word_size):
         # Initialize list to store the tuples of synonyms 
         synonyms = []
@@ -68,12 +67,10 @@ class CFGBacktracker:
             if torch.any(c1 != c2):
                 synonyms.append((c1, c2))
         return synonyms
-        
-    
+
     def apply_synonyms_change(self, synonyms, sentences):
         """
-        Replaces the synonyms[1] subsections in all sentences with synonyms[0].
-            
+        Replaces the synonyms[1] subsections in all sentences with synonyms[0].    
         Returns:
             torch.Tensor: The modified sentences with the synonym2 replaced with synonym1 in every sentences.
         """
@@ -92,7 +89,7 @@ class CFGBacktracker:
                 new_sentences[i] = torch.cat(list(words))
             return new_sentences
         return sentences
-    
+
     def find_all_synonym_pairs(self, sentences):
         # Find synonyms at current level
         min_dist_pair = (-2, -2)
@@ -107,7 +104,7 @@ class CFGBacktracker:
             sentences = self.apply_synonyms_change(synonyms, sentences)
             iter += 1
         return pairs_of_synonyms
-    
+
     def store_rules(self, pairs_of_synonyms, level):
         # Store rules by arbitrarily attributing groups of synonyms a word of the level above
         generation_rules = {}
@@ -119,7 +116,7 @@ class CFGBacktracker:
         self.backtracked_rules[level] = generation_rules
         print(generation_rules, word_to_upper_level_symbol)
         return word_to_upper_level_symbol
-    
+
     def build_upper_level_seq(self, level, curr_level_sentences, word_to_upper_level_symbol):
         # Create the sentences at the level above
         old_sentences = torch.unique(curr_level_sentences, dim=0)
@@ -129,7 +126,7 @@ class CFGBacktracker:
             for i, w in enumerate(words):
                 upper_level_sentences[k, i] = word_to_upper_level_symbol[tuple(w.tolist())]
         return upper_level_sentences
-    
+
     def backtrack_cfg(self, sentences):
         for lev in range(self.cfg.L -1, 1, -1):
             pairs_of_synonyms = self.find_all_synonym_pairs(sentences)
