@@ -30,7 +30,7 @@ class CFGBacktracker:
 
 
     def find_closest_sentences(self, sentences, nb_allowed_differing_words, word_size):
-        min_dist = sentences.size(0)*10
+        min_dist = self.hamming_distance(sentences[0], sentences[1])
         min_dist_pair = (-1, -1)
         nb_sentences = sentences.size(0)
         for i in range(nb_sentences):
@@ -101,23 +101,47 @@ class CFGBacktracker:
         while min_dist_pair != (-1, -1):
             min_dist_pair = self.find_closest_sentences(sentences, 1, 8)
             synonyms = self.find_synonyms(sentences[min_dist_pair[0]], sentences[min_dist_pair[1]], 8)
-            pairs_of_synonyms.append(synonyms)
+            for t in synonyms:
+                pairs_of_synonyms.append(t)
             # Modifiy sentences by merging synonyms
             sentences = self.apply_synonyms_change(synonyms, sentences)
             iter += 1
+        print(iter)
+        print(pairs_of_synonyms)
+        if len(pairs_of_synonyms) == 0:
+            print("Could not find sentences that are only one word apart")
+            return
         # Store rules by arbitrarily attributing groups of synonyms a word of the level above
-        rules_dict = dict()
+        generation_rules = {}
+        word_to_upper_level_symbol = {}
         for i in range(len(pairs_of_synonyms)):
-            rules_dict[i] = pairs_of_synonyms[i]
-        self.backtracked_rules[level] = rules_dict
-        return iter, pairs_of_synonyms, sentences
+            generation_rules[i] = pairs_of_synonyms[i]
+            for w in pairs_of_synonyms[i]:
+                word_to_upper_level_symbol[tuple(w.tolist())] = i
+        self.backtracked_rules[level] = generation_rules
+        print(generation_rules, word_to_upper_level_symbol)
+        return word_to_upper_level_symbol
+    
+    def build_upper_level_seq(self, level, curr_level_sentences, word_to_upper_level_symbol):
+        # Create the sentences at the level above
+        old_sentences = torch.unique(curr_level_sentences, dim=0)
+        upper_level_sentences = torch.zeros((old_sentences.size(0), old_sentences.size(1) // self.cfg.T[level]))
+        for k in range(old_sentences.size(0)):
+            words = torch.split(old_sentences[k], self.cfg.T[level])
+            for i, w in enumerate(words):
+                upper_level_sentences[k, i] = word_to_upper_level_symbol[tuple(w.tolist())]
+        return upper_level_sentences
 
 # %%
-backtracker = CFGBacktracker()
-cfg = CFG(L=2, ns=[1, 9, 10], nr=[2, 2], T=[8, 8])
-sentences = cfg.sample_flattened(50)[0].squeeze(0)
-
-iter, new_sentences, sentences = backtracker.merge_sentences(sentences)
-print(iter)
+cfg = CFG(L=3, ns=[1, 9, 9, 10], nr=[2, 2, 2], T=[8, 8, 8])
+backtracker = CFGBacktracker(cfg)
+sentences = cfg.sample_flattened(1000)[0].squeeze(0)
+for lev in range(cfg.L -1, 1, -1):
+    word_to_upper_level_symbol = backtracker.store_level_rules(sentences, lev)
+    if word_to_upper_level_symbol is None:
+        print("Failed finding synonyms, no sentence in the corpus differ by only one word")
+    else:
+        sentences = backtracker.build_upper_level_seq(word_to_upper_level_symbol)
+    print(sentences)
 
 # %%
