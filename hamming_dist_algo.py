@@ -93,7 +93,7 @@ class CFGBacktracker:
             return new_sentences
         return sentences
     
-    def store_level_rules(self, sentences, level):
+    def find_all_synonym_pairs(self, sentences):
         # Find synonyms at current level
         min_dist_pair = (-2, -2)
         iter = 0
@@ -106,11 +106,9 @@ class CFGBacktracker:
             # Modifiy sentences by merging synonyms
             sentences = self.apply_synonyms_change(synonyms, sentences)
             iter += 1
-        print(iter)
-        print(pairs_of_synonyms)
-        if len(pairs_of_synonyms) == 0:
-            print("Could not find sentences that are only one word apart")
-            return
+        return pairs_of_synonyms
+    
+    def store_rules(self, pairs_of_synonyms, level):
         # Store rules by arbitrarily attributing groups of synonyms a word of the level above
         generation_rules = {}
         word_to_upper_level_symbol = {}
@@ -131,17 +129,20 @@ class CFGBacktracker:
             for i, w in enumerate(words):
                 upper_level_sentences[k, i] = word_to_upper_level_symbol[tuple(w.tolist())]
         return upper_level_sentences
-
+    
+    def backtrack_cfg(self, sentences):
+        for lev in range(self.cfg.L -1, 1, -1):
+            pairs_of_synonyms = self.find_all_synonym_pairs(sentences)
+            if len(pairs_of_synonyms) == 0:
+                print(f"Failed finding synonyms, no sentence in the corpus differs by only one word, stopping at level {lev}")
+                return
+            word_to_upper_level_symbol = self.store_level_rules(sentences, lev)
+            sentences = self.build_upper_level_seq(lev, word_to_upper_level_symbol)
+            print(sentences)
 # %%
-cfg = CFG(L=3, ns=[1, 9, 9, 10], nr=[2, 2, 2], T=[8, 8, 8])
+cfg = CFG(L=3, ns=[1, 9, 9, 10], nr=[2, 2, 2], T=[2, 2, 2])
 backtracker = CFGBacktracker(cfg)
 sentences = cfg.sample_flattened(1000)[0].squeeze(0)
-for lev in range(cfg.L - 1, 1, -1):
-    word_to_upper_level_symbol = backtracker.store_level_rules(sentences, lev)
-    if word_to_upper_level_symbol is None:
-        print("Failed finding synonyms, no sentence in the corpus differ by only one word")
-    else:
-        sentences = backtracker.build_upper_level_seq(word_to_upper_level_symbol)
-    print(sentences)
+backtracker.backtrack_cfg(sentences)
 
 # %%
