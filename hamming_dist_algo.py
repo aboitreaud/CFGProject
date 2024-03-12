@@ -22,42 +22,35 @@ from context_free_grammar import CFG
 
 # %%
 class CFGBacktracker:
-    def __init__(self, cfg) -> None:
+    def __init__(self, cfg, nb_allowed_differing_words=1) -> None:
         self.cfg = cfg
-
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.nb_allowed_differing_words = nb_allowed_differing_words
         # for each level, we store the 
         self.backtracked_rules = [{} for _ in range(self.cfg.L)]
 
-    def find_closest_sentences(self, sentences, nb_allowed_differing_words, word_size):
-        min_dist = self.hamming_distance(sentences[0], sentences[1])
-        min_dist_pair = (-1, -1)
-        nb_sentences = sentences.size(0)
-        for i in range(nb_sentences):
-            for j in range(i+1, nb_sentences):
-                dist = self.hamming_distance(sentences[i], sentences[j])
-                if 0 < dist < min_dist: # We are not interested in exact same sentences
-                    # Check how many words are different in the two sentences
-                    diff_mask = torch.ne(sentences[i], sentences[j])
-                    num_differing_items = diff_mask.sum().item()
-                    if num_differing_items <= nb_allowed_differing_words * word_size:
-                        min_dist = dist
-                        min_dist_pair = (i,j)
-        return min_dist_pair
+    def find_closest_pair(self, level, sentences):
+        sentences = sentences.to(self.device)
 
-    def hamming_distance(self, vec1, vec2):
-        """
-        Computes the Hamming distance between two vectors.
-        """
-        assert len(vec1) == len(vec2), "Vectors must have the same length"
+        distances = (sentences.unsqueeze(1) ^ sentences.unsqueeze(0)).sum(dim=2)
 
-        # Convert each vector to a binary string
-        bin_vec1 = ''.join(np.binary_repr(num, width=4) for num in vec1)
-        bin_vec2 = ''.join(np.binary_repr(num, width=4) for num in vec2)
+        # Mask with a value is not the min the diagonal and equal sentences
+        mask = distances == 0
+        distances[mask] = torch.max(distances[0])
 
-        # Count the number of differing bits
-        distance = sum(c1 != c2 for c1, c2 in zip(bin_vec1, bin_vec2))
+        min_index = distances.argmin(dim=None)
+        i = min_index // distances.shape[0]
+        j = min_index % distances.shape[0]
+        i, j = i.item(), j.item()
 
-        return distance
+        # Check how many words are different in the two sentences
+        diff_mask = torch.ne(sentences[i], sentences[j])
+        num_differing_items = diff_mask.sum().item()
+        # Return pair of sentences if they differ by nb_allowed_differing_words words max
+        if num_differing_items <= self.nb_allowed_differing_words * self.cfg.T[level]:
+            return i, j
+        else:
+            return None
 
     def find_synonyms(self, sentence1, sentence2, word_size):
         # Initialize list to store the tuples of synonyms 
@@ -70,7 +63,7 @@ class CFGBacktracker:
 
     def apply_synonyms_change(self, synonyms, sentences):
         """
-        Replaces the synonyms[1] subsections in all sentences with synonyms[0].    
+        Replaces the synonyms[1] subsections in all sentences with synonyms[0].
         Returns:
             torch.Tensor: The modified sentences with the synonym2 replaced with synonym1 in every sentences.
         """
@@ -90,22 +83,23 @@ class CFGBacktracker:
             return new_sentences
         return sentences
 
-    def find_all_synonym_pairs(self, sentences):
+    def find_all_synonym_pairs(self, level, sentences):
         # Find synonyms at current level
-        min_dist_pair = (-2, -2)
-        iter = 0
         pairs_of_synonyms = []
-        while min_dist_pair != (-1, -1):
-            min_dist_pair = self.find_closest_sentences(sentences, 1, 8)
-            synonyms = self.find_synonyms(sentences[min_dist_pair[0]], sentences[min_dist_pair[1]], 8)
+        iter = 0
+        min_dist_pair = self.find_closest_pair(level=level, sentences=sentences)
+        while min_dist_pair is not None:
+            synonyms = self.find_synonyms(sentences[min_dist_pair[0]], sentences[min_dist_pair[1]], self.cfg.T[level])
             for t in synonyms:
                 pairs_of_synonyms.append(t)
             # Modifiy sentences by merging synonyms
             sentences = self.apply_synonyms_change(synonyms, sentences)
             iter += 1
+            # Compute the pair for the next iter, that will occur only if it's not None
+            min_dist_pair = self.find_closest_pair(level=level, sentences=sentences)
         return pairs_of_synonyms
 
-    def store_rules(self, pairs_of_synonyms, level):
+    def store_rules(self, level, pairs_of_synonyms):
         # Store rules by arbitrarily attributing groups of synonyms a word of the level above
         generation_rules = {}
         word_to_upper_level_symbol = {}
@@ -114,7 +108,6 @@ class CFGBacktracker:
             for w in pairs_of_synonyms[i]:
                 word_to_upper_level_symbol[tuple(w.tolist())] = i
         self.backtracked_rules[level] = generation_rules
-        print(generation_rules, word_to_upper_level_symbol)
         return word_to_upper_level_symbol
 
     def build_upper_level_seq(self, level, curr_level_sentences, word_to_upper_level_symbol):
@@ -128,18 +121,22 @@ class CFGBacktracker:
         return upper_level_sentences
 
     def backtrack_cfg(self, sentences):
-        for lev in range(self.cfg.L -1, 1, -1):
-            pairs_of_synonyms = self.find_all_synonym_pairs(sentences)
+        for lev in range(self.cfg.L -1, 0, -1):
+            pairs_of_synonyms = self.find_all_synonym_pairs(level=lev, sentences=sentences)
             if len(pairs_of_synonyms) == 0:
                 print(f"Failed finding synonyms, no sentence in the corpus differs by only one word, stopping at level {lev}")
                 return
-            word_to_upper_level_symbol = self.store_rules(sentences, lev)
-            sentences = self.build_upper_level_seq(lev, word_to_upper_level_symbol)
+            print(pairs_of_synonyms)
+            word_to_upper_level_symbol = self.store_rules(lev, pairs_of_synonyms)
+            sentences = self.build_upper_level_seq(lev, sentences, word_to_upper_level_symbol)
             print(sentences)
 # %%
-cfg = CFG(L=3, ns=[1, 9, 9, 10], nr=[2, 2, 2], T=[2, 2, 2])
+cfg = CFG(L=3, ns=[1, 3, 9, 10], nr=[2, 2, 2], T=[2, 2, 2])
 backtracker = CFGBacktracker(cfg)
-sentences = cfg.sample_flattened(1000)[0].squeeze(0)
+sentences = cfg.sample_flattened(50)[0].squeeze(0)
 backtracker.backtrack_cfg(sentences)
+
+# %%
+sentences
 
 # %%
