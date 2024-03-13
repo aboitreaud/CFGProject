@@ -28,9 +28,10 @@ class CFGBacktracker:
         self.nb_allowed_differing_words = nb_allowed_differing_words
         # for each level, we store the rules at each level
         self.backtracked_rules = {lev: {} for lev in range(self.cfg.L)}
+        self.below_root_seq = None
 
     def find_closest_pair(self, level, sentences):
-        # sentences = sentences.to(self.device)
+        sentences = sentences.to(self.device)
 
         distances = (sentences.unsqueeze(1) ^ sentences.unsqueeze(0)).sum(dim=2)
 
@@ -134,11 +135,36 @@ class CFGBacktracker:
             print(pairs_of_synonyms)
             word_to_upper_level_symbol = self.store_rules(lev, pairs_of_synonyms)
             sentences = self.build_upper_level_seq(lev, sentences, word_to_upper_level_symbol)
+            if lev == 1:
+                self.below_root_seq = torch.unique(sentences, dim=0)
             print(self.backtracked_rules)
+
+    def generate_sentences(self, nspl):
+        sentences = torch.zeros((nspl, int(np.prod(self.cfg.T))), dtype=torch.int)
+        for i in range(nspl):
+            idx = np.random.randint(len(self.below_root_seq))
+            seq = self.below_root_seq[idx].tolist()
+            for lev in range(1, self.cfg.L):
+                new_seq = []
+                for s in seq:
+                    choices = list(self.backtracked_rules[lev][s])
+                    idx = np.random.randint(len(choices))
+                    new_seq.extend(choices[idx].tolist())
+                seq = torch.tensor(new_seq)
+            sentences[i] = seq
+        return sentences
+
 # %%
-cfg = CFG(L=3, ns=[1, 3, 9, 10], nr=[2, 2, 2], T=[4, 4, 2])
-sentences = cfg.sample_flattened(15000)[0].squeeze(0)
+cfg = CFG(L=2, ns=[1, 9, 10], nr=[2, 2], T=[8, 8])
+sentences = cfg.sample_flattened(1000)[0].squeeze(0)
 
 # %%
 backtracker = CFGBacktracker(cfg)
 backtracker.backtrack_cfg(sentences)
+
+# %%
+nspl = 100
+gen_sentences = backtracker.generate_sentences(nspl)
+
+# %%
+cfg.frac_of_gramatically_correct_sentences(gen_sentences.view([nspl] + cfg.T))
