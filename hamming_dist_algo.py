@@ -26,18 +26,18 @@ class CFGBacktracker:
         self.cfg = cfg
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.nb_allowed_differing_words = nb_allowed_differing_words
-        # for each level, we store the 
-        self.backtracked_rules = [{} for _ in range(self.cfg.L)]
+        # for each level, we store the rules at each level
+        self.backtracked_rules = {lev: {} for lev in range(self.cfg.L)}
 
     def find_closest_pair(self, level, sentences):
-        sentences = sentences.to(self.device)
+        # sentences = sentences.to(self.device)
 
         distances = (sentences.unsqueeze(1) ^ sentences.unsqueeze(0)).sum(dim=2)
 
-        # Mask with a value is not the min the diagonal and equal sentences
-        mask = distances == 0
-        distances[mask] = torch.max(distances[0])
-
+        # Find the min distance, among sentences not exactly equal, so with > 0 distance
+        zero_mask = (distances == 0)
+        # Mask the 0 with the maximal hamming distance of two sentences of the grammar
+        distances[zero_mask] = np.prod(self.cfg.T) * (self.cfg.ns[-1] + 1)
         min_index = distances.argmin(dim=None)
         i = min_index // distances.shape[0]
         j = min_index % distances.shape[0]
@@ -64,6 +64,7 @@ class CFGBacktracker:
     def apply_synonyms_change(self, synonyms, sentences):
         """
         Replaces the synonyms[1] subsections in all sentences with synonyms[0].
+
         Returns:
             torch.Tensor: The modified sentences with the synonym2 replaced with synonym1 in every sentences.
         """
@@ -97,7 +98,10 @@ class CFGBacktracker:
             iter += 1
             # Compute the pair for the next iter, that will occur only if it's not None
             min_dist_pair = self.find_closest_pair(level=level, sentences=sentences)
-        return pairs_of_synonyms
+            if min_dist_pair is not None:
+                if min_dist_pair[0] == min_dist_pair[1]:
+                    return pairs_of_synonyms, sentences
+        return pairs_of_synonyms, sentences
 
     def store_rules(self, level, pairs_of_synonyms):
         # Store rules by arbitrarily attributing groups of synonyms a word of the level above
@@ -113,7 +117,7 @@ class CFGBacktracker:
     def build_upper_level_seq(self, level, curr_level_sentences, word_to_upper_level_symbol):
         # Create the sentences at the level above
         old_sentences = torch.unique(curr_level_sentences, dim=0)
-        upper_level_sentences = torch.zeros((old_sentences.size(0), old_sentences.size(1) // self.cfg.T[level]))
+        upper_level_sentences = torch.zeros((old_sentences.size(0), old_sentences.size(1) // self.cfg.T[level]), dtype=torch.long)
         for k in range(old_sentences.size(0)):
             words = torch.split(old_sentences[k], self.cfg.T[level])
             for i, w in enumerate(words):
@@ -121,22 +125,20 @@ class CFGBacktracker:
         return upper_level_sentences
 
     def backtrack_cfg(self, sentences):
-        for lev in range(self.cfg.L -1, 0, -1):
-            pairs_of_synonyms = self.find_all_synonym_pairs(level=lev, sentences=sentences)
+        for lev in range(self.cfg.L - 1, 0, -1):
+            print(f'Working on level {lev}')
+            pairs_of_synonyms, sentences = self.find_all_synonym_pairs(level=lev, sentences=sentences)
             if len(pairs_of_synonyms) == 0:
                 print(f"Failed finding synonyms, no sentence in the corpus differs by only one word, stopping at level {lev}")
                 return
             print(pairs_of_synonyms)
             word_to_upper_level_symbol = self.store_rules(lev, pairs_of_synonyms)
             sentences = self.build_upper_level_seq(lev, sentences, word_to_upper_level_symbol)
-            print(sentences)
+            print(self.backtracked_rules)
 # %%
-cfg = CFG(L=3, ns=[1, 3, 9, 10], nr=[2, 2, 2], T=[2, 2, 2])
+cfg = CFG(L=3, ns=[1, 3, 9, 10], nr=[2, 2, 2], T=[4, 4, 2])
+sentences = cfg.sample_flattened(15000)[0].squeeze(0)
+
+# %%
 backtracker = CFGBacktracker(cfg)
-sentences = cfg.sample_flattened(50)[0].squeeze(0)
 backtracker.backtrack_cfg(sentences)
-
-# %%
-sentences
-
-# %%
