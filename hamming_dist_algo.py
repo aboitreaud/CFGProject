@@ -22,13 +22,13 @@ from context_free_grammar import CFG
 
 # %%
 class CFGBacktracker:
-    def __init__(self, cfg, nb_allowed_differing_words=1) -> None:
+    def __init__(self, cfg, nb_allowed_differing_words=1, on_gpu=True) -> None:
         self.cfg = cfg
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.nb_allowed_differing_words = nb_allowed_differing_words
         # for each level, we store the rules at each level
         self.backtracked_rules = {lev: {} for lev in range(self.cfg.L)}
         self.below_root_seq = None
+        self.device = torch.device("cuda") if on_gpu else "cpu"
 
     def find_closest_pair(self, level, sentences):
         sentences = sentences.to(self.device)
@@ -130,23 +130,23 @@ class CFGBacktracker:
             print(f'Working on level {lev}')
             pairs_of_synonyms, sentences = self.find_all_synonym_pairs(level=lev, sentences=sentences)
             if len(pairs_of_synonyms) == 0:
-                print(f"Failed finding synonyms, no sentence in the corpus differs by only one word, stopping at level {lev}")
-                return
-            print(pairs_of_synonyms)
+                print(f"Failed finding synonyms, no sentence in the corpus differs by only {self.nb_allowed_differing_words} words,\
+                       stopping at level {lev}")
+                return None
             word_to_upper_level_symbol = self.store_rules(lev, pairs_of_synonyms)
             sentences = self.build_upper_level_seq(lev, sentences, word_to_upper_level_symbol)
             if lev == 1:
                 self.below_root_seq = torch.unique(sentences, dim=0)
-            print(self.backtracked_rules)
+        return self.backtracked_rules
 
     def generate_sentences(self, nspl):
         sentences = torch.zeros((nspl, int(np.prod(self.cfg.T))), dtype=torch.int)
         for i in range(nspl):
             idx = np.random.randint(len(self.below_root_seq))
-            seq = self.below_root_seq[idx].tolist()
+            seq = self.below_root_seq[idx]
             for lev in range(1, self.cfg.L):
                 new_seq = []
-                for s in seq:
+                for s in seq.tolist():
                     choices = list(self.backtracked_rules[lev][s])
                     idx = np.random.randint(len(choices))
                     new_seq.extend(choices[idx].tolist())
@@ -155,16 +155,15 @@ class CFGBacktracker:
         return sentences
 
 # %%
-cfg = CFG(L=2, ns=[1, 9, 10], nr=[2, 2], T=[8, 8])
-sentences = cfg.sample_flattened(1000)[0].squeeze(0)
+cfg = CFG(L=3, ns=[1, 3, 9, 10], nr=[2, 2, 2], T=[8, 8, 8])
+for _ in range(20):
+    sentences = cfg.sample_flattened(8000)[0].squeeze(0)
+    backtracker = CFGBacktracker(cfg, nb_allowed_differing_words=3, on_gpu=False)
+    rules = backtracker.backtrack_cfg(sentences)
+    if rules is not None:
+        nspl = 100
+        gen_sentences = backtracker.generate_sentences(nspl)
+        cfg.frac_of_gramatically_correct_sentences(gen_sentences.view([nspl] + cfg.T))
+    print()
 
 # %%
-backtracker = CFGBacktracker(cfg)
-backtracker.backtrack_cfg(sentences)
-
-# %%
-nspl = 100
-gen_sentences = backtracker.generate_sentences(nspl)
-
-# %%
-cfg.frac_of_gramatically_correct_sentences(gen_sentences.view([nspl] + cfg.T))
