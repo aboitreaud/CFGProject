@@ -23,7 +23,7 @@ from context_free_grammar import CFG
 
 # %%
 class CFGBacktracker:
-    def __init__(self, cfg, nb_allowed_differing_words=1, on_gpu=True) -> None:
+    def __init__(self, cfg, nb_allowed_differing_words=1, on_gpu=True, chunk_size=1000) -> None:
         self.cfg = cfg
         # Max nb of differing between two sentences we allow to match synonyms
         self.nb_allowed_differing_words = nb_allowed_differing_words
@@ -32,13 +32,15 @@ class CFGBacktracker:
         # Store the words of level L-1 to start generation process
         self.below_root_seq = None
         self.device = torch.device("cuda") if on_gpu else "cpu"
+        self.chunk_size = chunk_size
 
-    def find_closest_pair(self, level, sentences, chunk_size=1000):
+    def find_closest_pair(self, level, sentences):
         """
         Given a corpus of sentences, find the two closest ones, with respect to the hamming distance
         It only returns the pair of closest sentences if they are less than 'self.nb_allowed_differing_words' apart
         Otherwise, None is returned, meaning that no synonyms will further be declared at that level on these sentences
         """
+        chunk_size = self.chunk_size
         num_chunks = math.ceil(sentences.size(0) / chunk_size)
         max_theoretical_dist = np.prod(self.cfg.T) * (self.cfg.ns[-1] + 1)
         min_global_dist = max_theoretical_dist
@@ -69,6 +71,9 @@ class CFGBacktracker:
                     min_pair = (min_i.item(), min_j.item())
                     chunk_min_pair = (i, j)
 
+        if chunk_min_pair == (None, None):
+            return None, None
+
         min_pair_global_indices = (chunk_min_pair[0]*chunk_size + min_pair[0],
                                    chunk_min_pair[1]*chunk_size + min_pair[1])
 
@@ -85,7 +90,7 @@ class CFGBacktracker:
         """
         Given two sentences, find the words at same position that are not equal and declare them synonyms
         """
-        synonyms = [] # List to store pairs (tuples) of synonyms
+        synonyms = []  # List to store pairs (tuples) of synonyms
 
         for c1, c2 in zip(sentence1.split(word_size), sentence2.split(word_size)):
             if torch.any(c1 != c2):
@@ -221,13 +226,14 @@ class CFGBacktracker:
 
 
 # %%
-if __name__ == 'main':
-    cfg = CFG(L=3, ns=[1, 3, 3, 10], nr=[2, 2, 2], T=[2, 2, 8])
-    for _ in range(20):
-        sentences = cfg.sample_flattened(10000)[0].squeeze(0)
-        backtracker = CFGBacktracker(cfg, nb_allowed_differing_words=3, on_gpu=False)
-        rules = backtracker.backtrack_cfg(sentences)
-        if rules is not None:
-            nspl = 100
-            gen_sentences = backtracker.generate_sentences(nspl)
-            print(cfg.frac_of_gramatically_correct_sentences(gen_sentences.view([nspl] + cfg.T))*100)
+cfg = CFG(L=3, ns=[1, 3, 3, 10], nr=[2, 2, 2], T=[8, 8, 8])
+for _ in range(5):
+    sentences = cfg.sample_flattened(100000)[0].squeeze(0)
+    backtracker = CFGBacktracker(cfg, nb_allowed_differing_words=5, on_gpu=True, chunk_size=1000)
+    rules = backtracker.backtrack_cfg(sentences)
+    if rules is not None:
+        nspl = 100
+        gen_sentences = backtracker.generate_sentences(nspl)
+        print(cfg.frac_of_gramatically_correct_sentences(gen_sentences.view([nspl] + cfg.T))*100)
+
+# %%
