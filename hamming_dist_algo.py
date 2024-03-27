@@ -169,7 +169,10 @@ class CFGBacktracker:
         Return the corpus of reconstructed sentences at level i+1
         """
         old_sentences = torch.unique(curr_level_sentences, dim=0)
-        upper_level_sentences = torch.zeros((old_sentences.size(0), old_sentences.size(1) // self.cfg.T[level]), dtype=torch.long)
+        upper_level_sentences = torch.zeros(
+            (old_sentences.size(0), old_sentences.size(1) // self.cfg.T[level]),
+            dtype=torch.long
+            )
         for k in range(old_sentences.size(0)):
             words = torch.split(old_sentences[k], self.cfg.T[level])
             for i, w in enumerate(words):
