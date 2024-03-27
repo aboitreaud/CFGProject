@@ -16,6 +16,7 @@
 
 # %%
 import numpy as np
+import math
 import torch
 from context_free_grammar import CFG
 
@@ -32,31 +33,51 @@ class CFGBacktracker:
         self.below_root_seq = None
         self.device = torch.device("cuda") if on_gpu else "cpu"
 
-    def find_closest_pair(self, level, sentences):
+    def find_closest_pair(self, level, sentences, chunk_size=1000):
         """
         Given a corpus of sentences, find the two closest ones, with respect to the hamming distance
         It only returns the pair of closest sentences if they are less than 'self.nb_allowed_differing_words' apart
         Otherwise, None is returned, meaning that no synonyms will further be declared at that level on these sentences
         """
-        sentences = sentences.to(self.device)
+        num_chunks = math.ceil(sentences.size(0) / chunk_size)
+        max_theoretical_dist = np.prod(self.cfg.T) * (self.cfg.ns[-1] + 1)
+        min_global_dist = max_theoretical_dist
+        min_pair = (None, None)
+        chunk_min_pair = (None, None)
+        for i in range(num_chunks):
+            chunk_i_start = i * chunk_size
+            chunk_i_end = min((i + 1) * chunk_size, sentences.size(0))
 
-        distances = (sentences.unsqueeze(1) ^ sentences.unsqueeze(0)).sum(dim=2)
+            for j in range(i, num_chunks):
+                chunk_j_start = j * chunk_size
+                chunk_j_end = min((j + 1) * chunk_size, sentences.size(0))
 
-        # Find the min distance, among sentences not exactly equal, so with > 0 distance
-        zero_mask = (distances == 0)
-        # Mask the 0 with the theoretical maximal hamming distance of two sentences of the grammar
-        distances[zero_mask] = np.prod(self.cfg.T) * (self.cfg.ns[-1] + 1)
-        min_index = distances.argmin(dim=None)
-        i = min_index // distances.shape[0]
-        j = min_index % distances.shape[0]
-        i, j = i.item(), j.item()
+                # Get the chunks of sentence
+                chunk_i = sentences[chunk_i_start:chunk_i_end].to(self.device)
+                chunk_j = sentences[chunk_j_start:chunk_j_end].to(self.device)
+
+                xor_result = chunk_i.unsqueeze(1) ^ chunk_j.unsqueeze(0)
+                hamming_distances = torch.sum(xor_result != 0, dim=2)
+                # Mask the zero entries
+                hamming_distances = hamming_distances.masked_fill(hamming_distances == 0, max_theoretical_dist)
+
+                # Find the indices of the pair with the minimum Hamming distance
+                min_chunk_dist, min_indices = torch.min(hamming_distances.view(-1), dim=0)
+                min_i, min_j = min_indices // hamming_distances.shape[1], min_indices % hamming_distances.shape[1]
+
+                if min_chunk_dist < min_global_dist:
+                    min_pair = (min_i.item(), min_j.item())
+                    chunk_min_pair = (i, j)
+
+        min_pair_global_indices = (chunk_min_pair[0]*chunk_size + min_pair[0],
+                                   chunk_min_pair[1]*chunk_size + min_pair[1])
 
         # Check how many words are different in the two sentences
-        diff_mask = torch.ne(sentences[i], sentences[j])
+        diff_mask = torch.ne(sentences[min_pair_global_indices[0]], sentences[min_pair_global_indices[1]])
         num_differing_items = diff_mask.sum().item()
-        # Return pair of sentences if they differ by less than nb_allowed_differing_words words
+        # Return pair of sentences if they differ by nb_allowed_differing_words words max
         if num_differing_items <= self.nb_allowed_differing_words * self.cfg.T[level]:
-            return i, j
+            return min_pair_global_indices
         else:
             return None
 
@@ -195,16 +216,15 @@ class CFGBacktracker:
             sentences[i] = seq
         return sentences
 
-# %%
-cfg = CFG(L=3, ns=[1, 3, 9, 10], nr=[2, 2, 2], T=[8, 8, 8])
-for _ in range(20):
-    sentences = cfg.sample_flattened(8000)[0].squeeze(0)
-    backtracker = CFGBacktracker(cfg, nb_allowed_differing_words=3, on_gpu=False)
-    rules = backtracker.backtrack_cfg(sentences)
-    if rules is not None:
-        nspl = 100
-        gen_sentences = backtracker.generate_sentences(nspl)
-        cfg.frac_of_gramatically_correct_sentences(gen_sentences.view([nspl] + cfg.T))
-    print()
 
 # %%
+if __name__ == 'main':
+    cfg = CFG(L=3, ns=[1, 3, 3, 10], nr=[2, 2, 2], T=[2, 2, 8])
+    for _ in range(20):
+        sentences = cfg.sample_flattened(10000)[0].squeeze(0)
+        backtracker = CFGBacktracker(cfg, nb_allowed_differing_words=3, on_gpu=False)
+        rules = backtracker.backtrack_cfg(sentences)
+        if rules is not None:
+            nspl = 100
+            gen_sentences = backtracker.generate_sentences(nspl)
+            print(cfg.frac_of_gramatically_correct_sentences(gen_sentences.view([nspl] + cfg.T))*100)
